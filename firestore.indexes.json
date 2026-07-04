@@ -1,0 +1,29 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "installmentPayments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "planId",    "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "homeStitchLedger",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "referenceId", "order": "ASCENDING" },
+        { "fieldPath": "category",    "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "purchasePayments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "purchaseId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt",  "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

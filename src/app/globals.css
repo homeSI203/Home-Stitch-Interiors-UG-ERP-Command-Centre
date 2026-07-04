@@ -1,0 +1,261 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── Brand-green base (light sage, bright & clean) ──────────────── */
+    --background: 150 22% 96%;
+    --foreground: 150 35% 13%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 150 35% 13%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 35% 13%;
+
+    --primary: 150 32% 18%;
+    --primary-foreground: 150 22% 96%;
+
+    --secondary: 150 16% 91%;
+    --secondary-foreground: 150 32% 18%;
+
+    --muted: 150 14% 91%;
+    --muted-foreground: 150 18% 36%;
+
+    --accent: 42 55% 52%;
+    --accent-foreground: 150 32% 12%;
+
+    --destructive: 0 84% 58%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 150 14% 86%;
+    --input: 150 14% 86%;
+    --ring: 150 32% 18%;
+
+    --radius: 0.625rem;
+
+    /* Custom brand shadows */
+    --shadow-sm: 0 1px 3px rgba(31, 61, 43, 0.06);
+    --shadow-md: 0 4px 16px rgba(31, 61, 43, 0.08);
+    --shadow-lg: 0 8px 32px rgba(31, 61, 43, 0.10);
+  }
+
+  .dark {
+    --background: 150 32% 8%;
+    --foreground: 36 33% 95%;
+    --card: 150 28% 12%;
+    --card-foreground: 36 33% 95%;
+    --popover: 150 28% 12%;
+    --popover-foreground: 36 33% 95%;
+    --primary: 36 33% 95%;
+    --primary-foreground: 150 32% 18%;
+    --secondary: 150 20% 16%;
+    --secondary-foreground: 36 33% 95%;
+    --muted: 150 20% 16%;
+    --muted-foreground: 36 15% 65%;
+    --accent: 42 52% 54%;
+    --accent-foreground: 150 32% 12%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 150 20% 20%;
+    --input: 150 20% 20%;
+    --ring: 42 52% 54%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans text-base leading-relaxed antialiased;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Headings keep brand serif; body/UI stays sans-serif */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight text-foreground;
+  }
+
+  p, li, td, th, label, span, dd, dt {
+    @apply leading-relaxed;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Keep form controls crisp with Geist */
+  input, textarea, select, button, kbd, code, pre {
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+  }
+
+  /* Input values in dark brown for legibility */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  textarea,
+  select {
+    color: hsl(25 60% 22%) !important;
+  }
+
+  /* Better focus rings */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-gold/50 ring-offset-2;
+  }
+}
+
+@layer components {
+  /* ── Page section ─────────────────────────────────────────────────── */
+  .page-section {
+    @apply rounded-xl border bg-card shadow-sm overflow-hidden;
+  }
+
+  /* ── Divider ──────────────────────────────────────────────────────── */
+  .divider {
+    @apply h-px w-full bg-border;
+  }
+
+  /* ── Data table ───────────────────────────────────────────────────── */
+  .data-table {
+    @apply w-full text-sm leading-relaxed;
+  }
+
+  .data-table th {
+    @apply px-4 py-3 text-left text-sm font-semibold tracking-wide
+           border-b first:rounded-tl-lg last:rounded-tr-lg font-ui;
+    background-color: hsl(150, 20%, 93%);
+    color: hsl(150, 32%, 24%);
+  }
+
+  .data-table td {
+    @apply px-4 py-3.5 border-b border-border/60 align-middle font-ui text-sm leading-relaxed;
+  }
+
+  .data-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .data-table tbody tr {
+    @apply transition-colors;
+  }
+
+  .data-table tbody tr:hover td {
+    background-color: hsl(150, 20%, 94%);
+  }
+
+  .data-table tbody tr:nth-child(even) td {
+    background-color: hsl(150, 16%, 97%);
+  }
+
+  .data-table tbody tr:nth-child(even):hover td {
+    background-color: hsl(150, 20%, 94%);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* ── Brand gradients ──────────────────────────────────────────────── */
+  .gradient-brand {
+    background: linear-gradient(135deg, #1f3d2b 0%, #5a3e2b 100%);
+  }
+
+  .gradient-gold {
+    background: linear-gradient(135deg, #c9a24a 0%, #e8c97a 100%);
+  }
+
+  .gradient-gold-subtle {
+    background: linear-gradient(135deg, rgba(201, 162, 74, 0.12) 0%, rgba(232, 201, 122, 0.06) 100%);
+  }
+
+  .gradient-green-subtle {
+    background: linear-gradient(135deg, rgba(31, 61, 43, 0.09) 0%, rgba(31, 61, 43, 0.03) 100%);
+  }
+
+  /* ── Solid light-green surface (used for section headers, toolbar tints) */
+  .bg-green-tint {
+    background-color: hsl(150, 20%, 93%);
+  }
+
+  /* ── Display heading (Playfair) — titles only ─────────────────────── */
+  .text-display {
+    @apply font-display tracking-tight leading-tight;
+  }
+
+  /* ── Gold left accent bar ─────────────────────────────────────────── */
+  .accent-bar {
+    @apply border-l-4 border-brand-gold pl-4;
+  }
+
+  /* ── Subtle page background texture ──────────────────────────────── */
+  .page-bg {
+    background-color: hsl(150, 22%, 96%);
+    background-image:
+      radial-gradient(circle at 10% 15%, rgba(31, 61, 43, 0.07) 0%, transparent 50%),
+      radial-gradient(circle at 90% 85%, rgba(31, 61, 43, 0.04) 0%, transparent 50%),
+      radial-gradient(circle at 55% 50%, rgba(201, 162, 74, 0.03) 0%, transparent 40%);
+  }
+
+  /* ── Status badge colors ──────────────────────────────────────────── */
+  .badge-active    { @apply bg-emerald-50 text-emerald-700 border border-emerald-200; }
+  .badge-inactive  { @apply bg-slate-50   text-slate-600   border border-slate-200; }
+  .badge-pending   { @apply bg-amber-50   text-amber-700   border border-amber-200; }
+  .badge-paid      { @apply bg-emerald-50 text-emerald-700 border border-emerald-200; }
+  .badge-overdue   { @apply bg-red-50     text-red-700     border border-red-200; }
+  .badge-draft     { @apply bg-sky-50     text-sky-700     border border-sky-200; }
+  .badge-cancelled { @apply bg-red-50     text-red-600     border border-red-200; }
+  .badge-archived  { @apply bg-stone-50   text-stone-500   border border-stone-200; }
+
+  /* ── Card hover lift ──────────────────────────────────────────────── */
+  .card-hover {
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md;
+  }
+
+  /* ── Shimmer skeleton ─────────────────────────────────────────────── */
+  .skeleton {
+    @apply relative overflow-hidden rounded-md bg-muted;
+  }
+
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.6) 50%,
+      transparent 100%
+    );
+    animation: shimmer 1.6s infinite;
+  }
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(200%); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.animate-fade-in   { animation: fade-in 0.35s ease-out both; }
+.animate-slide-in  { animation: slide-in-right 0.3s ease-out both; }
+
+/* Staggered children */
+.stagger > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger > *:nth-child(2)  { animation-delay: 60ms; }
+.stagger > *:nth-child(3)  { animation-delay: 120ms; }
+.stagger > *:nth-child(4)  { animation-delay: 180ms; }
+.stagger > *:nth-child(5)  { animation-delay: 240ms; }
+.stagger > *:nth-child(6)  { animation-delay: 300ms; }

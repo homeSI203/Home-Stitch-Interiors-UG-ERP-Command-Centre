@@ -1,0 +1,286 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    /** Signed in but Firestore profile not created yet (bootstrap / repair) */
+    function canBootstrap() {
+      return isAuthenticated() && !userDocExists();
+    }
+
+    function isActiveUser() {
+      return isAuthenticated() && userDocExists() && getUserData().active == true;
+    }
+
+    function isDesignatedOwner() {
+      return isAuthenticated() && request.auth.token.email in [
+        'homestitchinteriorsug@gmail.com',
+        'elisasaychitoleko2@gmail.com'
+      ];
+    }
+
+    function isSuperAdmin() {
+      return isActiveUser() && (
+        'superAdmin' in getUserData().roles ||
+        'super_admin' in getUserData().roles
+      );
+    }
+
+    function hasPerm(perm) {
+      return isSuperAdmin() || (
+        userDocExists() && perm in getUserData().effectivePermissions
+      );
+    }
+
+    function systemNotInitialized() {
+      return !exists(/databases/$(database)/documents/roles/superAdmin)
+        && !exists(/databases/$(database)/documents/roles/super_admin);
+    }
+
+    function canManageUsers() {
+      return isSuperAdmin() || hasPerm('manage_users');
+    }
+
+    function canManageRoles() {
+      return isSuperAdmin() || hasPerm('manage_roles');
+    }
+
+    function canManagePermissions() {
+      return isSuperAdmin() || hasPerm('manage_permissions');
+    }
+
+    function canViewAuditLogs() {
+      return isSuperAdmin() || hasPerm('view_audit_logs');
+    }
+
+    function canReadRbac() {
+      return systemNotInitialized() || canBootstrap() || isActiveUser();
+    }
+
+    function canWriteRbac() {
+      return isAuthenticated() && (
+        canBootstrap() || systemNotInitialized() || canManageRoles()
+      );
+    }
+
+    function canWritePermissions() {
+      return isAuthenticated() && (
+        canBootstrap() || systemNotInitialized() || canManagePermissions()
+      );
+    }
+
+    function canViewHomeStitch() {
+      return hasPerm('view_home_stitch_account') ||
+        hasPerm('manage_home_stitch_account') ||
+        hasPerm('view_accounting') || hasPerm('view_sales') ||
+        hasPerm('manage_accounting') || hasPerm('view_expenses') ||
+        hasPerm('view_purchases') || hasPerm('manage_purchases');
+    }
+
+    function canManageHomeStitch() {
+      return hasPerm('manage_home_stitch_account') ||
+        hasPerm('manage_accounting') || hasPerm('create_sales') ||
+        hasPerm('manage_purchases');
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || canManageUsers()
+      );
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == userId && (
+          isDesignatedOwner() ||
+          !resource.data.keys().hasAny(['roles', 'effectivePermissions', 'active']) ||
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['roles', 'effectivePermissions', 'active'])
+        )) ||
+        canManageUsers()
+      );
+      allow delete: if canManageUsers();
+    }
+
+    match /roles/{roleId} {
+      allow read: if canReadRbac();
+      allow create: if canWriteRbac();
+      allow update: if canManageRoles();
+      allow delete: if canManageRoles() && !resource.data.get('isSystem', false);
+    }
+
+    match /permissions/{permId} {
+      allow read: if canReadRbac();
+      allow create: if canWritePermissions();
+      allow update: if canManagePermissions();
+      allow delete: if canManagePermissions();
+    }
+
+    match /rolePermissions/{roleId} {
+      allow read: if canReadRbac();
+      allow create, update: if canWriteRbac();
+      allow delete: if canManageRoles();
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if canViewAuditLogs();
+      allow create: if isActiveUser() || canBootstrap();
+      allow update, delete: if false;
+    }
+
+    match /settings/{docId} {
+      allow read: if hasPerm('view_settings') || isSuperAdmin();
+      allow write: if hasPerm('manage_settings') || isSuperAdmin();
+    }
+
+    match /products/{docId} {
+      allow read: if hasPerm('view_inventory');
+      allow write: if hasPerm('manage_inventory');
+    }
+
+    match /categories/{docId} {
+      allow read: if hasPerm('view_inventory');
+      allow write: if hasPerm('manage_inventory');
+    }
+
+    match /brands/{docId} {
+      allow read: if hasPerm('view_inventory');
+      allow write: if hasPerm('manage_inventory');
+    }
+
+    match /customers/{docId} {
+      allow read: if hasPerm('view_customers');
+      allow write: if hasPerm('manage_customers');
+    }
+
+    match /suppliers/{docId} {
+      allow read: if hasPerm('view_suppliers');
+      allow write: if hasPerm('manage_suppliers');
+    }
+
+    match /sales/{docId} {
+      allow read: if hasPerm('view_sales');
+      allow write: if hasPerm('create_sales');
+    }
+
+    match /saleItems/{docId} {
+      allow read: if hasPerm('view_sales');
+      allow write: if hasPerm('create_sales');
+    }
+
+    match /purchases/{docId} {
+      allow read: if hasPerm('view_purchases') || hasPerm('view_accounting') || hasPerm('manage_accounting');
+      allow write: if hasPerm('manage_purchases');
+    }
+
+    match /purchaseItems/{docId} {
+      allow read: if hasPerm('view_purchases');
+      allow write: if hasPerm('manage_purchases');
+    }
+
+    match /quotations/{docId} {
+      allow read: if hasPerm('view_quotations');
+      allow write: if hasPerm('manage_quotations');
+    }
+
+    match /proformaInvoices/{docId} {
+      allow read: if hasPerm('view_proforma');
+      allow write: if hasPerm('manage_proforma');
+    }
+
+    match /invoices/{docId} {
+      allow read: if hasPerm('view_invoices');
+      allow write: if hasPerm('manage_invoices');
+    }
+
+    match /receipts/{docId} {
+      allow read: if hasPerm('view_receipts');
+      allow write: if hasPerm('manage_receipts');
+    }
+
+    match /expenses/{docId} {
+      allow read: if hasPerm('view_accounting') || hasPerm('view_expenses') || hasPerm('view_sales');
+      allow write: if hasPerm('manage_accounting');
+    }
+
+    match /accounts/{docId} {
+      allow read: if canViewHomeStitch();
+      allow write: if hasPerm('manage_accounting') || (
+        hasPerm('create_sales') && docId == 'home-stitch'
+      ) || (
+        hasPerm('manage_purchases') && docId == 'home-stitch'
+      ) || (
+        hasPerm('manage_home_stitch_account') && docId == 'home-stitch'
+      );
+    }
+
+    match /journalEntries/{docId} {
+      allow read: if hasPerm('view_accounting');
+      allow write: if hasPerm('post_journal_entries');
+    }
+
+    match /cashbook/{docId} {
+      allow read: if hasPerm('view_accounting');
+      allow write: if hasPerm('manage_accounting');
+    }
+
+    match /receivables/{docId} {
+      allow read: if hasPerm('view_accounting');
+      allow write: if hasPerm('manage_accounting');
+    }
+
+    match /payables/{docId} {
+      allow read: if hasPerm('view_accounting');
+      allow write: if hasPerm('manage_accounting');
+    }
+
+    match /inventoryMovements/{docId} {
+      allow read: if hasPerm('view_inventory');
+      allow write: if hasPerm('adjust_stock');
+    }
+
+    match /customOrders/{docId} {
+      allow read: if hasPerm('view_custom_orders');
+      allow write: if hasPerm('manage_custom_orders');
+    }
+
+    match /installments/{docId} {
+      allow read: if hasPerm('view_sales');
+      allow write: if hasPerm('create_sales');
+    }
+
+    match /installmentPayments/{docId} {
+      allow read: if hasPerm('view_sales');
+      allow write: if hasPerm('create_sales');
+    }
+
+    match /cashClosings/{docId} {
+      allow read: if hasPerm('view_sales');
+      allow write: if hasPerm('create_sales');
+    }
+
+    match /homeStitchLedger/{docId} {
+      allow read: if canViewHomeStitch();
+      allow write: if canManageHomeStitch();
+    }
+
+    match /purchasePayments/{docId} {
+      allow read: if hasPerm('view_purchases') || hasPerm('view_accounting') || hasPerm('manage_accounting');
+      allow write: if hasPerm('manage_purchases') || hasPerm('manage_accounting');
+    }
+
+    match /notifications/{docId} {
+      allow read: if isActiveUser() && resource.data.userId == request.auth.uid;
+      allow write: if isActiveUser();
+    }
+  }
+}
