@@ -23,6 +23,17 @@ export function formatDate(date: Date | string): string {
   }).format(d);
 }
 
+/** 12-hour clock, e.g. 3:24:08 PM */
+export function formatTime12h(date: Date | string, withSeconds = false): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleTimeString("en-UG", {
+    hour: "numeric",
+    minute: "2-digit",
+    ...(withSeconds ? { second: "2-digit" } : {}),
+    hour12: true,
+  });
+}
+
 export function getInitials(name: string): string {
   return name
     .split(" ")

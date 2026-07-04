@@ -16,6 +16,7 @@ import {
   type InstallmentPlan,
   type InstallmentPayment,
 } from "@/services/installment.service";
+import { formatTime12h } from "@/lib/utils";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -284,7 +285,7 @@ export default function InstallmentDetailPage() {
                         <td className="text-muted-foreground text-xs text-center">{payments.length - i}</td>
                         <td className="whitespace-nowrap">
                           <div className="text-xs">{pmt.paidAt.toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" })}</div>
-                          <div className="text-xs text-muted-foreground">{pmt.paidAt.toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</div>
+                          <div className="text-xs text-muted-foreground">{formatTime12h(pmt.paidAt, true)}</div>
                         </td>
                         <td>
                           <span className="inline-flex items-center gap-1 text-xs">

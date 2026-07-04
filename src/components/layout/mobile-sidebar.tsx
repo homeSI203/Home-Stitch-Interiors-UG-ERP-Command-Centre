@@ -53,19 +53,27 @@ export function MobileSidebar() {
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             className="fixed inset-y-0 left-0 z-50 w-72 bg-brand-green text-brand-beige lg:hidden flex flex-col"
           >
-            {/* Logo */}
+            {/* Logo + system name */}
             <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
               <Link
                 href="/dashboard"
-                className="flex items-center"
+                className="flex items-center gap-3 min-w-0"
                 onClick={() => setMobileOpen(false)}
               >
                 <img
                   src="/logos/logo-white.png"
-                  alt="Home Stitch"
-                  className="h-12 w-auto"
+                  alt={COMPANY.shortName}
+                  className="h-10 w-auto shrink-0"
                   style={{ mixBlendMode: "screen" }}
                 />
+                <div className="min-w-0 flex flex-col gap-0.5">
+                  <span className="font-display text-sm font-semibold text-brand-beige leading-tight truncate">
+                    {COMPANY.shortName}
+                  </span>
+                  <span className="font-ui text-[10px] font-medium uppercase tracking-widest text-brand-gold/90 leading-tight truncate">
+                    {COMPANY.systemName}
+                  </span>
+                </div>
               </Link>
               <Button
                 variant="ghost"

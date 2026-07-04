@@ -4,15 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { useDashboardStats } from "@/hooks/use-dashboard";
-import { useAuth, useAuthorization } from "@/hooks/use-auth";
-import { getUserDisplayName } from "@/lib/auth-utils";
+import { useAuth } from "@/hooks/use-auth";
+import { isSuperAdmin as checkSuperAdmin } from "@/lib/auth-utils";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { listEntities } from "@/services/entity.service";
 import {
   TrendingUp, TrendingDown, ShoppingCart, Users, Package,
   AlertTriangle, DollarSign, Activity,
-  ArrowRight, Zap, BarChart2, ShieldCheck, RefreshCw,
+  ArrowRight, Zap, BarChart2,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -32,24 +32,6 @@ interface LowStockItem {
   quantity: number;
   reorderLevel: number;
   categoryName: string;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getGreeting(): string {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
-}
-
-function useClock() {
-  const [time, setTime] = useState(new Date());
-  useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  return time;
 }
 
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
@@ -113,10 +95,9 @@ function SectionHeader({ title, action }: { title: string; action?: { label: str
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { data: stats, isLoading, refetch } = useDashboardStats();
+  const { data: stats, isLoading } = useDashboardStats();
   const { user } = useAuth();
-  const { isSuperAdmin } = useAuthorization();
-  const clock = useClock();
+  const userIsSuperAdmin = checkSuperAdmin(user?.roles);
   const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
   const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
   const [loadingExtra, setLoadingExtra] = useState(true);
@@ -157,48 +138,8 @@ export default function DashboardPage() {
   };
 
   return (
-    <DashboardLayout title="Dashboard">
+    <DashboardLayout>
       <div className="space-y-6 pb-8">
-
-        {/* ── Hero Banner ── */}
-        <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white px-6 py-5 shadow-lg">
-          {/* subtle grid pattern */}
-          <div className="absolute inset-0 opacity-5" style={{
-            backgroundImage: "repeating-linear-gradient(0deg,transparent,transparent 31px,rgba(255,255,255,.3) 31px,rgba(255,255,255,.3) 32px),repeating-linear-gradient(90deg,transparent,transparent 31px,rgba(255,255,255,.3) 31px,rgba(255,255,255,.3) 32px)"
-          }} />
-          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                {isSuperAdmin && (
-                  <span className="inline-flex items-center gap-1 bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[11px] font-bold px-2 py-0.5 rounded-full">
-                    <ShieldCheck className="h-3 w-3" /> SUPER ADMIN
-                  </span>
-                )}
-              </div>
-              <h1 className="text-2xl font-black tracking-tight">
-                {getGreeting()}, {user?.firstName || getUserDisplayName(user ?? {})} 👋
-              </h1>
-              <p className="text-gray-400 text-sm mt-1">
-                Home Stitch Interiors UG — ERP Command Centre
-              </p>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="text-3xl font-mono font-bold text-white">
-                {clock.toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-              </p>
-              <p className="text-gray-400 text-sm mt-0.5">
-                {clock.toLocaleDateString("en-UG", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-              </p>
-              <button
-                type="button"
-                onClick={() => refetch()}
-                className="mt-2 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
-              >
-                <RefreshCw className="h-3 w-3" /> Refresh data
-              </button>
-            </div>
-          </div>
-        </div>
 
         {/* ── KPI Grid ── */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -372,7 +313,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── System Status (Super Admin only) ── */}
-        {isSuperAdmin && (
+        {userIsSuperAdmin && (
           <div>
             <SectionHeader title="System Modules" action={{ label: "All Settings", href: "/settings" }} />
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">

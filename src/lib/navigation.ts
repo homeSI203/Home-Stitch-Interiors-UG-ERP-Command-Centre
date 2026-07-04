@@ -288,4 +288,6 @@ export const COMPANY = {
   name: "HOME STITCH INTERIORS UG",
   tagline: "Where Comfort is Woven",
   shortName: "Home Stitch",
+  systemName: "ERP Command Centre",
+  brandLine: "Home Stitch Interiors UG — ERP Command Centre",
 };

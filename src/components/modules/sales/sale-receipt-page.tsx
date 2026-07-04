@@ -3,9 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getEntity } from "@/services/entity.service";
-import { formatCurrency } from "@/lib/utils";
-import { formatDate } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { formatCurrency, formatDate, formatTime12h, cn } from "@/lib/utils";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Loader2, Printer, ArrowLeft, LayoutTemplate } from "lucide-react";
 
@@ -73,7 +71,7 @@ function ThermalReceipt({ sale }: { sale: Sale }) {
         <div className="border-t border-dashed border-gray-400 my-2" />
         <p className="font-semibold text-[12px]">RECEIPT</p>
         <p className="text-gray-500">{sale.saleNumber}</p>
-        <p className="text-gray-500">{date.toLocaleDateString("en-UG")} {date.toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit" })}</p>
+        <p className="text-gray-500">{date.toLocaleDateString("en-UG")} {formatTime12h(date)}</p>
       </div>
 
       {/* Customer */}
@@ -151,7 +149,7 @@ function A4Receipt({ sale }: { sale: Sale }) {
           </div>
           <p className="text-gray-700 font-semibold text-sm">{sale.saleNumber}</p>
           <p className="text-gray-500 text-sm">{formatDate(date)}</p>
-          <p className="text-gray-500 text-sm">{date.toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit" })}</p>
+          <p className="text-gray-500 text-sm">{formatTime12h(date)}</p>
         </div>
       </div>
 
@@ -176,7 +174,7 @@ function A4Receipt({ sale }: { sale: Sale }) {
         </div>
         <div>
           <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Date & Time</p>
-          <p className="font-semibold text-gray-900">{formatDate(date)} · {date.toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit" })}</p>
+          <p className="font-semibold text-gray-900">{formatDate(date)} · {formatTime12h(date)}</p>
         </div>
       </div>
 

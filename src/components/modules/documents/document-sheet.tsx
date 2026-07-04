@@ -13,6 +13,7 @@ import type { CompanyProfile } from "@/types/domain";
 import { Loader2 } from "lucide-react";
 import type { LineItem } from "./document-form";
 import type { CurtainRoom, CurtainItemType } from "./customized-document-form";
+import { formatTime12h } from "@/lib/utils";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ function fmtTime(val: unknown): string {
   if (!val) return "—";
   try {
     const d = val instanceof Date ? val : new Date(String(val));
-    return d.toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return formatTime12h(d, true);
   } catch { return "—"; }
 }
 

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { getEntity } from "@/services/entity.service";
 import { getCompanyProfile } from "@/services/company.service";
 import type { CompanyProfile } from "@/types/domain";
+import { formatTime12h } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -84,7 +85,7 @@ function fmtTime(val: unknown): string {
   if (!val) return "—";
   try {
     const d = val instanceof Date ? val : new Date(String(val));
-    return d.toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return formatTime12h(d, true);
   } catch { return "—"; }
 }
 

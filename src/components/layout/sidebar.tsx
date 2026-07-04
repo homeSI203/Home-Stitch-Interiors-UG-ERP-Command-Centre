@@ -149,22 +149,30 @@ export function Sidebar() {
           isCollapsed ? "w-[72px]" : "w-64"
         )}
       >
-        {/* Logo */}
+        {/* Logo + system name */}
         <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
           {!isCollapsed ? (
-            <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
+            <Link href="/dashboard" className="flex items-center gap-3 min-w-0">
               <img
                 src="/logos/logo-white.png"
-                alt="Home Stitch"
-                className="h-12 w-auto shrink-0"
+                alt={COMPANY.shortName}
+                className="h-10 w-auto shrink-0"
                 style={{ mixBlendMode: "screen" }}
               />
+              <div className="min-w-0 flex flex-col gap-0.5">
+                <span className="font-display text-sm font-semibold text-brand-beige leading-tight truncate">
+                  {COMPANY.shortName}
+                </span>
+                <span className="font-ui text-[10px] font-medium uppercase tracking-widest text-brand-gold/90 leading-tight truncate">
+                  {COMPANY.systemName}
+                </span>
+              </div>
             </Link>
           ) : (
-            <Link href="/dashboard" className="mx-auto">
+            <Link href="/dashboard" className="mx-auto" title={COMPANY.systemName}>
               <img
                 src="/logos/logo-white.png"
-                alt="Home Stitch"
+                alt={COMPANY.shortName}
                 className="h-9 w-auto"
                 style={{ mixBlendMode: "screen" }}
               />

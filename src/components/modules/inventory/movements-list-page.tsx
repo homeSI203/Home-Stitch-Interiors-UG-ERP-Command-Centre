@@ -15,8 +15,7 @@ import {
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { listEntities, exportToCsv, downloadCsv } from "@/services/entity.service";
-import { formatCurrency } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { formatCurrency, formatTime12h, cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -287,7 +286,7 @@ export function MovementsListPage({ config }: { config: PageConfig }) {
                       <td className="py-2 px-3 text-gray-400 text-xs whitespace-nowrap">
                         {m.createdAt
                           ? m.createdAt.toLocaleDateString("en-UG") + " " +
-                            m.createdAt.toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit" })
+                            formatTime12h(m.createdAt)
                           : "—"}
                       </td>
                     </tr>

@@ -13,8 +13,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, formatTime12h } from "@/lib/utils";
 import { createEntity, listEntities } from "@/services/entity.service";
 import { useAuth } from "@/hooks/use-auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
@@ -273,7 +272,7 @@ export function PosPage() {
   const [mobileMoneyStep, setMobileMoneyStep] = useState(false);
 
   const now = new Date();
-  const timeStr = now.toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const timeStr = formatTime12h(now, true);
   const dateStr = now.toLocaleDateString("en-UG", { year: "numeric", month: "short", day: "2-digit" });
 
   useEffect(() => {

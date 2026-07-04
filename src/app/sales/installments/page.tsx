@@ -7,6 +7,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { PageHeader } from "@/components/erp/page-header";
 import { Button } from "@/components/ui/button";
 import { listInstallmentPlans, type InstallmentPlan } from "@/services/installment.service";
+import { formatTime12h } from "@/lib/utils";
 
 function fmtUGX(n: number) {
   return new Intl.NumberFormat("en-UG", { maximumFractionDigits: 0 }).format(n);
@@ -110,7 +111,7 @@ export default function InstallmentsListPage() {
                     <td><StatusBadge status={p.status} /></td>
                     <td className="text-xs text-muted-foreground whitespace-nowrap">
                       <div>{p.createdAt.toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" })}</div>
-                      <div>{p.createdAt.toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit" })}</div>
+                      <div>{formatTime12h(p.createdAt)}</div>
                     </td>
                     <td>
                       <Button asChild variant="ghost" size="sm" className="font-ui text-xs">

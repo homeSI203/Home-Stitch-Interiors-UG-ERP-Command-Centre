@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn, formatTime12h } from "@/lib/utils";
 
 // ─── PageHeader ───────────────────────────────────────────────────────────────
 
@@ -99,7 +99,7 @@ export function formatCellValue(
       return (
         <span className="tabular-nums text-muted-foreground text-xs leading-tight">
           <span className="block">{d.toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" })}</span>
-          <span className="block font-medium text-foreground/70">{d.toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+          <span className="block font-medium text-foreground/70">{formatTime12h(d, true)}</span>
         </span>
       );
     }
