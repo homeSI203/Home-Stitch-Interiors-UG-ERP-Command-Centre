@@ -231,14 +231,18 @@ function PrintSheet({
           <div><span style={{ color: GREEN, fontWeight: 700 }}>Quotation No.: </span>{docNumber}</div>
           <div><span style={{ color: GREEN, fontWeight: 700 }}>Date: </span>{fmtDate(data.createdAt)}</div>
           <div><span style={{ color: GREEN, fontWeight: 700 }}>Time: </span>{fmtTime(data.createdAt)}</div>
-          {dateVal && config.dateField !== "createdAt" && (
+          {dateVal != null && config.dateField !== "createdAt" ? (
             <div><span style={{ color: GREEN, fontWeight: 700 }}>{config.dateLabel}: </span>{fmtDate(dateVal)}</div>
-          )}
+          ) : null}
         </div>
         <div style={{ textAlign: "right", lineHeight: 1.7 }}>
           <div><span style={{ color: GREEN, fontWeight: 700 }}>Customer: </span>{String(data.customerName ?? "—")}</div>
-          {data.customerPhone && <div><span style={{ color: GREEN, fontWeight: 700 }}>Phone: </span>{String(data.customerPhone)}</div>}
-          {data.customerAddress && <div><span style={{ color: GREEN, fontWeight: 700 }}>Address: </span>{String(data.customerAddress)}</div>}
+          {String(data.customerPhone ?? "").trim() ? (
+            <div><span style={{ color: GREEN, fontWeight: 700 }}>Phone: </span>{String(data.customerPhone)}</div>
+          ) : null}
+          {String(data.customerAddress ?? "").trim() ? (
+            <div><span style={{ color: GREEN, fontWeight: 700 }}>Address: </span>{String(data.customerAddress)}</div>
+          ) : null}
         </div>
       </div>
 
@@ -510,11 +514,11 @@ function PrintSheet({
         </tbody>
       </table>
 
-      {data.notes && (
+      {String(data.notes ?? "").trim() ? (
         <div style={{ marginTop: 14, fontSize: "10pt", borderTop: `1px solid ${GREEN}40`, paddingTop: 8, color: "#444" }}>
           <span style={{ fontWeight: 700, color: GREEN }}>Notes: </span>{String(data.notes)}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

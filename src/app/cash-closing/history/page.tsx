@@ -178,14 +178,14 @@ export default function CashClosingHistoryPage() {
           <p className="font-ui text-sm">{search ? "No closings match your search." : "No cash closings recorded yet."}</p>
           {!search && (
             <Button asChild variant="outline" size="sm">
-              <Link href="/cash-closing">Close Today's Cash</Link>
+              <Link href="/cash-closing">Close Today&apos;s Cash</Link>
             </Button>
           )}
         </div>
       ) : (
         <div className="space-y-3">
           {filtered.map((c) => {
-            const { grandTotal, expectedClose, actualAmount, variance } = closingRecon(c);
+            const { expectedClose, actualAmount, variance } = closingRecon(c);
             const diff = closeDiffStatus(variance);
             const isExpanded = expanded === c.closingDate;
             const variantIcon =

@@ -19,7 +19,7 @@ import type { LineItem } from "@/components/modules/documents/document-form";
 
 const PAGE_SIZE = 15;
 
-interface ProformaDoc {
+interface ProformaDoc extends Record<string, unknown> {
   id: string;
   proformaNumber?: string;
   customerName?: string;

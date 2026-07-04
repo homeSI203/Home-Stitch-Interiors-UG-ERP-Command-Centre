@@ -11,6 +11,7 @@ import {
   exportToCsv,
   listEntities,
 } from "@/services/entity.service";
+import type { ColumnConfig } from "@/lib/erp/entity-config";
 
 const PAGE_SIZE = 15;
 
@@ -26,7 +27,7 @@ export function ReportPage({
   description: string;
   permission: string;
   collection: string;
-  columns: { key: string; label: string; format?: "text" | "currency" | "date" | "badge" | "number" }[];
+  columns: ColumnConfig[];
   filterFn?: (item: Record<string, unknown>) => boolean;
 }) {
   const [items, setItems] = useState<Record<string, unknown>[]>([]);

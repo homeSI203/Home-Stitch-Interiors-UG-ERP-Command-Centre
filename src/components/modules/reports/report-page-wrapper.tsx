@@ -2,13 +2,14 @@
 
 import { ReportPage } from "@/components/erp/report-page";
 import { ENTITY_MODULES } from "@/lib/erp/modules";
+import type { ColumnConfig } from "@/lib/erp/entity-config";
 
 const REPORT_CONFIG: Record<string, {
   title: string;
   description: string;
   permission: string;
   collection: string;
-  columns: { key: string; label: string; format?: "text" | "currency" | "date" | "badge" | "number" }[];
+  columns: ColumnConfig[];
   filterFn?: (item: Record<string, unknown>) => boolean;
 }> = {
   sales: {

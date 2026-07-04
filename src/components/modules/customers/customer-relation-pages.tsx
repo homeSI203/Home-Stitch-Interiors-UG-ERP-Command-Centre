@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { ReportPage } from "@/components/erp/report-page";
 import { DocumentPdfPage } from "@/components/erp/document-pdf-page";
 import { ENTITY_MODULES } from "@/lib/erp/modules";
+import type { ColumnConfig } from "@/lib/erp/entity-config";
 import { getEntity } from "@/services/entity.service";
 
 function useCustomerId() {
@@ -18,7 +19,7 @@ function CustomerFilteredReport({
   title,
 }: {
   collection: string;
-  columns: { key: string; label: string; format?: "text" | "currency" | "date" | "badge" | "number" }[];
+  columns: ColumnConfig[];
   title: string;
 }) {
   const customerId = useCustomerId();

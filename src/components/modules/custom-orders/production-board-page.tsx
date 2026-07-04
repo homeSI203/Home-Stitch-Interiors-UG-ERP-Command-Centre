@@ -89,11 +89,11 @@ function OrderCard({
       </div>
 
       {/* Product type */}
-      {order.productType && (
+      {String(order.productType ?? "").trim() ? (
         <p className="mt-1.5 text-xs font-semibold text-brand-green font-ui truncate">
           {String(order.productType)}
         </p>
-      )}
+      ) : null}
 
       {/* Amount */}
       {total > 0 && (

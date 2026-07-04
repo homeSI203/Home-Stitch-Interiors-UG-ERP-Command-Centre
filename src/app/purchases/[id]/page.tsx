@@ -166,12 +166,12 @@ export default function PurchaseDetailPage() {
             </div>
           )}
 
-          {data.notes && (
+          {String(data.notes ?? "").trim() ? (
             <div className="page-section p-4 font-ui text-sm">
               <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Notes</p>
               <p>{String(data.notes)}</p>
             </div>
-          )}
+          ) : null}
         </div>
       )}
     </DashboardLayout>
