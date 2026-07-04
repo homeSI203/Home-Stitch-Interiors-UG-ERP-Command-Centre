@@ -20,6 +20,11 @@ function isConfigValid(): boolean {
   );
 }
 
+/** Safe to call on client — NEXT_PUBLIC_* vars are inlined at build time. */
+export function isFirebaseConfigured(): boolean {
+  return isConfigValid();
+}
+
 let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
 let db: Firestore | undefined;

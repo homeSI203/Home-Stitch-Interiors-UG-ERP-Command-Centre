@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { ChunkErrorHandler } from "@/components/providers/chunk-error-handler";
+import { FirebaseConfigGuard } from "@/components/providers/firebase-config-guard";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
@@ -39,12 +40,14 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} font-sans antialiased`}
       >
-        <ChunkErrorHandler />
-        <QueryProvider>
-          <AuthProvider>
-            <TooltipProvider>{children}</TooltipProvider>
-          </AuthProvider>
-        </QueryProvider>
+        <FirebaseConfigGuard>
+          <ChunkErrorHandler />
+          <QueryProvider>
+            <AuthProvider>
+              <TooltipProvider>{children}</TooltipProvider>
+            </AuthProvider>
+          </QueryProvider>
+        </FirebaseConfigGuard>
       </body>
     </html>
   );
