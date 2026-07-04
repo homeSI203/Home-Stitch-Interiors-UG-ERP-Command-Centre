@@ -26,7 +26,7 @@ export function DashboardLayout({
   requiredPermission,
   requiredAnyPermission,
 }: DashboardLayoutProps) {
-  const { isAuthenticated, isLoading, user, effectivePermissions } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const { canAccessRoute, hasPermission, isSuperAdmin } = useAuthorization();
   const router = useRouter();
   const pathname = usePathname();
@@ -45,8 +45,6 @@ export function DashboardLayout({
     isSuperAdmin,
     requiredPermission,
     requiredAnyPermission,
-    effectivePermissions,
-    user?.roles,
     pathname,
     hasPermission,
     canAccessRoute,

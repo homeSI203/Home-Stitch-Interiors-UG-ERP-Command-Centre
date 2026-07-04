@@ -94,6 +94,10 @@ service cloud.firestore {
         hasPerm('manage_purchases');
     }
 
+    function canViewNotifications() {
+      return hasPerm('view_notifications');
+    }
+
     match /users/{userId} {
       allow read: if isAuthenticated() && (
         request.auth.uid == userId || canManageUsers()
@@ -279,8 +283,8 @@ service cloud.firestore {
     }
 
     match /notifications/{docId} {
-      allow read: if isActiveUser() && resource.data.userId == request.auth.uid;
-      allow write: if isActiveUser();
+      allow read: if canViewNotifications();
+      allow create, update, delete: if canViewNotifications();
     }
   }
 }

@@ -18,7 +18,7 @@ export function ResetPasswordForm() {
   const oobCode = params.get("oobCode");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { register, handleSubmit, watch } = useForm<{ password: string; confirm: string }>();
+  const { register, handleSubmit } = useForm<{ password: string; confirm: string }>();
 
   const onSubmit = async ({ password, confirm }: { password: string; confirm: string }) => {
     if (password !== confirm) {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import {
-  Package, Users, Truck, ShoppingBag, ShoppingCart, FileText, FileCheck, Receipt,
+  Package, Users, Truck, ShoppingBag, ShoppingCart, FileText, FileCheck,
   Calculator, BarChart3, Settings, Scissors, Wallet, Bell, ArrowRight, ArrowUpDown,
   RotateCcw, AlertTriangle, TrendingUp, Scale, Tag, Grid3X3, Box, History,
   CreditCard, PercentSquare, BarChart2, BookOpen, Landmark, DollarSign,
