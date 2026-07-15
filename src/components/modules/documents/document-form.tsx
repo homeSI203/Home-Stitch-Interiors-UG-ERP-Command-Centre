@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
@@ -12,6 +13,7 @@ import {
   createEntity,
   getEntity,
   updateEntity,
+  listEntities,
   findEntitiesByField,
   deleteEntityPermanently,
 } from "@/services/entity.service";
@@ -45,6 +47,15 @@ export interface LineItem {
   qty: number;
   unitPrice: number;
   amount: number;
+}
+
+interface InventoryProduct {
+  id: string;
+  name: string;
+  sku: string;
+  size?: string;
+  sellingPrice: number;
+  categoryName?: string;
 }
 
 interface FormState {
@@ -85,6 +96,155 @@ function fmtUGX(n: number) {
   return new Intl.NumberFormat("en-UG", { maximumFractionDigits: 0 }).format(n);
 }
 
+function filterProducts(products: InventoryProduct[], query: string): InventoryProduct[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  return products
+    .map((p) => {
+      const name = p.name.toLowerCase();
+      const sku = p.sku.toLowerCase();
+      const cat = (p.categoryName ?? "").toLowerCase();
+      let score = 0;
+      if (name.startsWith(q)) score += 4;
+      else if (name.includes(q)) score += 3;
+      if (sku.startsWith(q)) score += 2;
+      else if (sku.includes(q)) score += 1;
+      if (cat.includes(q)) score += 1;
+      return { p, score };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name))
+    .slice(0, 20)
+    .map((x) => x.p);
+}
+
+function ProductSearchInput({
+  value,
+  onChange,
+  onPick,
+  products,
+  productsLoading,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onPick: (p: InventoryProduct) => void;
+  products: InventoryProduct[];
+  productsLoading?: boolean;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLUListElement>(null);
+
+  const query = value.trim();
+  const hasQuery = query.length > 0;
+  const matches = useMemo(() => filterProducts(products, query), [products, query]);
+  const showDropdown = open && hasQuery;
+
+  const syncDropdownPosition = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setDropdownPos({
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: Math.max(rect.width, 280),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!showDropdown) return;
+    syncDropdownPosition();
+    window.addEventListener("scroll", syncDropdownPosition, true);
+    window.addEventListener("resize", syncDropdownPosition);
+    return () => {
+      window.removeEventListener("scroll", syncDropdownPosition, true);
+      window.removeEventListener("resize", syncDropdownPosition);
+    };
+  }, [showDropdown, syncDropdownPosition, matches.length]);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target) || dropdownRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const dropdown =
+    showDropdown && dropdownPos && typeof document !== "undefined"
+      ? createPortal(
+          <ul
+            ref={dropdownRef}
+            className="fixed z-[9999] max-h-52 overflow-y-auto rounded-lg border border-border bg-background shadow-lg text-sm font-ui"
+            style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+          >
+            {productsLoading ? (
+              <li className="flex items-center gap-2 px-3 py-2.5 text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading products…
+              </li>
+            ) : matches.length === 0 ? (
+              <li className="px-3 py-2.5 text-muted-foreground">
+                No products matching &ldquo;{query}&rdquo;
+              </li>
+            ) : (
+              matches.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-2 hover:bg-muted/60 focus:bg-muted/60 border-b border-border/40 last:border-0"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      onPick(p);
+                      setOpen(false);
+                    }}
+                  >
+                    <span className="font-medium text-foreground">{p.name}</span>
+                    <span className="block text-xs text-muted-foreground mt-0.5">
+                      {p.sku}
+                      {p.categoryName ? ` · ${p.categoryName}` : ""}
+                      {" · UGX "}
+                      {fmtUGX(p.sellingPrice)}
+                    </span>
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>,
+          document.body
+        )
+      : null;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          if (value.trim().length > 0) setOpen(true);
+        }}
+        placeholder={placeholder}
+        className={className}
+        autoComplete="off"
+      />
+      {dropdown}
+    </div>
+  );
+}
+
 // ─── DocumentForm ─────────────────────────────────────────────────────────────
 
 export function DocumentForm({
@@ -103,6 +263,29 @@ export function DocumentForm({
   const [error, setError] = useState<string | null>(null);
   const [duplicates, setDuplicates] = useState<Record<string, unknown>[]>([]);
   const [merging, setMerging] = useState(false);
+  const [products, setProducts] = useState<InventoryProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+
+  useEffect(() => {
+    setProductsLoading(true);
+    listEntities<Record<string, unknown>>("products")
+      .then((r) => {
+        setProducts(
+          r.items
+            .filter((p) => (p.status ?? "active") !== "archived")
+            .map((p): InventoryProduct => ({
+              id: String(p.id ?? ""),
+              name: String(p.name ?? ""),
+              sku: String(p.sku ?? ""),
+              size: p.size ? String(p.size) : undefined,
+              sellingPrice: Number(p.sellingPrice ?? 0),
+              categoryName: p.categoryName ? String(p.categoryName) : undefined,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+        );
+      })
+      .finally(() => setProductsLoading(false));
+  }, []);
 
   // Load in edit mode
   useEffect(() => {
@@ -165,6 +348,23 @@ export function DocumentForm({
       const safe = items.length ? items : [emptyItem()];
       return { ...prev, items: safe, ...recalc(safe, prev.taxRate) };
     });
+
+  const pickProduct = (index: number, product: InventoryProduct) => {
+    setForm((prev) => {
+      const items = prev.items.map((item, i) => {
+        if (i !== index) return item;
+        const unitPrice = product.sellingPrice;
+        return {
+          ...item,
+          description: product.name,
+          size: product.size ?? "",
+          unitPrice,
+          amount: Math.round(Number(item.qty) * unitPrice),
+        };
+      });
+      return { ...prev, items, ...recalc(items, prev.taxRate) };
+    });
+  };
 
   const handleTaxRate = (val: string) => {
     const rate = Math.max(0, Number(val));
@@ -406,10 +606,13 @@ export function DocumentForm({
                       </td>
                       {/* Description */}
                       <td className="px-3 py-2">
-                        <Input
+                        <ProductSearchInput
                           value={item.description}
-                          onChange={(e) => updateItem(i, "description", e.target.value)}
-                          placeholder="e.g. Bedsheets (Pair)"
+                          onChange={(v) => updateItem(i, "description", v)}
+                          onPick={(p) => pickProduct(i, p)}
+                          products={products}
+                          productsLoading={productsLoading}
+                          placeholder="Type to search products…"
                           className="h-8 min-w-[180px] font-ui text-sm"
                         />
                       </td>

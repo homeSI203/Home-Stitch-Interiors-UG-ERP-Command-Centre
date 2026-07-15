@@ -162,6 +162,7 @@ export interface CustomOrder extends BaseEntity {
   materials?: string;
   laborCost: number;
   materialCost: number;
+  meters: number;
   total: number;
   deliveryDate?: string;
   productionStage: string;

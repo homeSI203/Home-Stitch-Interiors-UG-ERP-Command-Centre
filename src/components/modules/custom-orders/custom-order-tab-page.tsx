@@ -12,8 +12,8 @@ import { ENTITY_MODULES } from "@/lib/erp/modules";
 
 const TAB_FIELDS: Record<string, string[]> = {
   measurements: ["measurements", "productType"],
-  materials: ["materials", "materialCost"],
-  labor: ["laborCost", "productionStage"],
+  materials: ["materials", "materialCost", "meters"],
+  labor: ["laborCost", "total", "productionStage"],
   timeline: ["productionStage", "createdAt", "deliveryDate"],
   delivery: ["deliveryDate", "customerName", "address"],
 };

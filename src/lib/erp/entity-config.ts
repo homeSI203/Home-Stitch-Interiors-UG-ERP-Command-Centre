@@ -62,8 +62,14 @@ export interface EntityConfig {
   searchableFields: string[];
   detailFields?: string[];
   statusField?: string;
-  /** Override the default Archive row action. "print" opens /<basePath>/<id>/receipt */
+  /** Override the default Archive row action. "print" opens /<basePath>/<id>/<printPath> */
   rowAction?: "archive" | "print";
+  /** URL segment for print action. Defaults to "receipt" (sales) or use "pdf" for documents. */
+  printPath?: string;
+  /** Hide the edit button on list rows */
+  hideEdit?: boolean;
+  /** Kanban / production board URL for order tracking */
+  trackingBoardPath?: string;
   /** Additional row actions shown before edit/archive */
   listRowActions?: ListRowAction[];
 }

@@ -148,9 +148,17 @@ export function EntityFormPage({ config, mode, id, afterCreate }: EntityFormPage
     setError(null);
     try {
       if (mode === "create") {
-        const newId = await createEntity(config.collection, values);
-        if (afterCreate) await afterCreate(newId, values);
-        router.push(`${config.basePath}/${newId}`);
+        const payload = { ...values };
+        if (config.collection === "customOrders") {
+          if (!payload.productionStage) payload.productionStage = "pending";
+          if (!payload.status) payload.status = "active";
+        }
+        const newId = await createEntity(config.collection, payload);
+        if (afterCreate) {
+          await afterCreate(newId, payload);
+        } else {
+          router.push(`${config.basePath}/${newId}`);
+        }
       } else if (id) {
         await updateEntity(config.collection, id, values);
         router.push(`${config.basePath}/${id}`);

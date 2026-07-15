@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Download, Archive, Eye, Pencil, Inbox, Printer, CreditCard } from "lucide-react";
+import { Plus, Search, Download, Archive, Eye, Pencil, Inbox, Printer, CreditCard, LayoutGrid } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { Button } from "@/components/ui/button";
@@ -139,14 +139,24 @@ export function EntityListPage({ config }: { config: EntityConfig }) {
         title={config.labelPlural}
         description={`Search, filter, and manage ${config.labelPlural.toLowerCase()}`}
         actions={
-          <PermissionGate permission={config.managePermission}>
-            <Button asChild variant="gold">
-              <Link href={`${config.basePath}/new`}>
-                <Plus className="mr-2 h-4 w-4" />
-                New {config.label}
-              </Link>
-            </Button>
-          </PermissionGate>
+          <>
+            {config.trackingBoardPath && (
+              <Button asChild variant="outline">
+                <Link href={config.trackingBoardPath}>
+                  <LayoutGrid className="mr-2 h-4 w-4" />
+                  Production Board
+                </Link>
+              </Button>
+            )}
+            <PermissionGate permission={config.managePermission}>
+              <Button asChild variant="gold">
+                <Link href={`${config.basePath}/new`}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New {config.label}
+                </Link>
+              </Button>
+            </PermissionGate>
+          </>
         }
       />
 
@@ -251,31 +261,46 @@ export function EntityListPage({ config }: { config: EntityConfig }) {
                             <Eye className="h-3.5 w-3.5" />
                           </Link>
                         </Button>
-                        <PermissionGate permission={config.managePermission}>
+                        {config.rowAction === "print" ? (
                           <Button asChild variant="ghost" size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-brand-gold hover:bg-brand-gold/10">
-                            <Link href={`${config.basePath}/${row.id}/edit`}>
-                              <Pencil className="h-3.5 w-3.5" />
+                            className="h-8 w-8 text-muted-foreground hover:text-brand-green hover:bg-brand-green/10"
+                            title="Print">
+                            <Link href={`${config.basePath}/${row.id}/${config.printPath ?? "receipt"}`}>
+                              <Printer className="h-3.5 w-3.5" />
                             </Link>
                           </Button>
-                          {config.rowAction === "print" ? (
-                            <Button asChild variant="ghost" size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-brand-green hover:bg-brand-green/10">
-                              <Link href={`${config.basePath}/${row.id}/receipt`}>
-                                <Printer className="h-3.5 w-3.5" />
-                              </Link>
-                            </Button>
-                          ) : (
+                        ) : (
+                          <PermissionGate permission={config.managePermission}>
+                            {!config.hideEdit && (
+                              <Button asChild variant="ghost" size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-brand-gold hover:bg-brand-gold/10">
+                                <Link href={`${config.basePath}/${row.id}/edit`}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Link>
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
                               onClick={() => handleArchive(String(row.id))}
                               className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              title="Archive"
                             >
                               <Archive className="h-3.5 w-3.5" />
                             </Button>
-                          )}
-                        </PermissionGate>
+                          </PermissionGate>
+                        )}
+                        {config.rowAction === "print" && !config.hideEdit && (
+                          <PermissionGate permission={config.managePermission}>
+                            <Button asChild variant="ghost" size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-brand-gold hover:bg-brand-gold/10"
+                              title="Edit">
+                              <Link href={`${config.basePath}/${row.id}/edit`}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                          </PermissionGate>
+                        )}
                       </div>
                     </td>
                   </tr>

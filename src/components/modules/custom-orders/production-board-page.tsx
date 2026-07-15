@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Loader2, ChevronRight, ExternalLink, RefreshCw } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { PageHeader } from "@/components/erp/page-header";
@@ -39,6 +40,7 @@ function OrderCard({
   order,
   stageIdx,
   isUpdating,
+  highlighted,
   onAdvance,
   onDragStart,
   onDragEnd,
@@ -46,6 +48,7 @@ function OrderCard({
   order: Order;
   stageIdx: number;
   isUpdating: boolean;
+  highlighted?: boolean;
   onAdvance: () => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd:   () => void;
@@ -63,6 +66,8 @@ function OrderCard({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       className={`group relative bg-white rounded-xl border shadow-sm p-3.5 cursor-grab active:cursor-grabbing transition-all select-none ${
+        highlighted ? "ring-2 ring-brand-gold border-brand-gold shadow-md" : ""
+      } ${
         isUpdating ? "opacity-60 pointer-events-none" : "hover:shadow-md hover:-translate-y-0.5"
       }`}
     >
@@ -128,6 +133,8 @@ function OrderCard({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function ProductionBoardPage() {
+  const searchParams = useSearchParams();
+  const highlightOrderId = searchParams.get("order");
   const [orders,   setOrders]   = useState<Order[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -137,7 +144,9 @@ export function ProductionBoardPage() {
   const reload = useCallback(async () => {
     setLoading(true);
     const r = await listEntities<Order>("customOrders");
-    setOrders(r.items);
+    setOrders(
+      r.items.filter((o) => String(o.status ?? "active") !== "archived")
+    );
     setLoading(false);
   }, []);
 
@@ -200,14 +209,19 @@ export function ProductionBoardPage() {
     <DashboardLayout title="Production Board" requiredPermission="view_custom_orders">
       <PageHeader
         title="Production Board"
-        description="Drag cards across columns or tap → to advance an order to the next stage"
+        description="Custom orders appear here for production tracking — drag cards across columns or tap → to advance"
         actions={
-          <Button variant="outline" size="sm" onClick={reload} disabled={loading} className="font-ui text-xs">
-            {loading
-              ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm" className="font-ui text-xs">
+              <Link href="/custom-orders">All Orders</Link>
+            </Button>
+            <Button variant="outline" size="sm" onClick={reload} disabled={loading} className="font-ui text-xs">
+              {loading
+                ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+              Refresh
+            </Button>
+          </div>
         }
       />
 
@@ -295,6 +309,7 @@ export function ProductionBoardPage() {
                         order={order}
                         stageIdx={stageIdx}
                         isUpdating={updating === String(order.id)}
+                        highlighted={highlightOrderId === String(order.id)}
                         onAdvance={() => advanceOrder(order)}
                         onDragStart={(e) => onDragStart(e, String(order.id))}
                         onDragEnd={onDragEnd}

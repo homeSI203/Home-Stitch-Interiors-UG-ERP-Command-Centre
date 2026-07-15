@@ -1,8 +1,9 @@
 "use client";
+
 import { useParams } from "next/navigation";
-import { EntityFormPage } from "@/components/erp/entity-form-page";
-import { ENTITY_MODULES } from "@/lib/erp/modules";
+import { CustomOrderFormPage } from "@/components/modules/custom-orders/custom-order-form-page";
+
 export default function Page() {
   const params = useParams();
-  return <EntityFormPage config={ENTITY_MODULES.customOrder} mode="edit" id={params.id as string} />;
+  return <CustomOrderFormPage mode="edit" id={params.id as string} />;
 }

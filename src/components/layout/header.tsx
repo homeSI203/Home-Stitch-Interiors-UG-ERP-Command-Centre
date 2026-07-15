@@ -42,11 +42,13 @@ function HeaderDateTime({
   compactDate,
   showRefresh,
   onRefresh,
+  onDark,
 }: {
   clock: Date;
   compactDate?: boolean;
   showRefresh?: boolean;
   onRefresh?: () => void;
+  onDark?: boolean;
 }) {
   const dateLabel = clock.toLocaleDateString("en-UG", compactDate
     ? { weekday: "short", day: "numeric", month: "short", year: "numeric" }
@@ -55,17 +57,26 @@ function HeaderDateTime({
   return (
     <>
       <div className="flex flex-col items-end text-right mr-1 shrink-0">
-        <p className="text-xs sm:text-sm font-mono font-semibold tabular-nums text-foreground leading-none">
+        <p className={cn(
+          "text-xs sm:text-sm font-mono font-semibold tabular-nums leading-none",
+          onDark ? "text-white" : "text-foreground"
+        )}>
           {formatTime12h(clock, true)}
         </p>
-        <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight hidden sm:block max-w-[240px] truncate">
+        <p className={cn(
+          "text-[10px] mt-0.5 leading-tight hidden sm:block max-w-[240px] truncate",
+          onDark ? "text-white/75" : "text-muted-foreground"
+        )}>
           {dateLabel}
         </p>
         {showRefresh && onRefresh && (
           <button
             type="button"
             onClick={onRefresh}
-            className="mt-1 hidden md:inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+            className={cn(
+              "mt-1 hidden md:inline-flex items-center gap-1 text-[10px] transition-colors",
+              onDark ? "text-white/70 hover:text-white" : "text-muted-foreground hover:text-foreground"
+            )}
           >
             <RefreshCw className="h-3 w-3" />
             Refresh data
@@ -77,7 +88,10 @@ function HeaderDateTime({
           variant="ghost"
           size="icon"
           onClick={onRefresh}
-          className="md:hidden text-muted-foreground hover:text-foreground shrink-0"
+          className={cn(
+            "md:hidden shrink-0",
+            onDark ? "text-white/80 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-foreground"
+          )}
           title="Refresh data"
         >
           <RefreshCw className="h-4 w-4" />
@@ -113,9 +127,10 @@ export function Header({ title, description }: HeaderProps) {
     <header className={cn(
       "sticky top-0 z-40 flex items-center justify-between gap-3",
       isDashboard ? "min-h-[72px] py-2" : "h-15 min-h-[60px]",
-      "border-b border-border/60 backdrop-blur-md",
-      "bg-[hsl(150,22%,98%)]/90",
-      "px-4 lg:px-6 shadow-sm"
+      "border-b backdrop-blur-md px-4 lg:px-6 shadow-sm",
+      isDashboard
+        ? "bg-brand-green border-brand-green/40 text-white"
+        : "border-border/60 bg-[hsl(150,22%,98%)]/90"
     )}>
       {/* Gold accent line at very top */}
       <div className="absolute inset-x-0 top-0 h-[2px] gradient-gold opacity-60" />
@@ -125,7 +140,10 @@ export function Header({ title, description }: HeaderProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="lg:hidden shrink-0 text-muted-foreground hover:text-foreground"
+          className={cn(
+            "lg:hidden shrink-0",
+            isDashboard ? "text-white/85 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-foreground"
+          )}
           onClick={() => setMobileOpen(true)}
         >
           <Menu className="h-5 w-5" />
@@ -160,16 +178,22 @@ export function Header({ title, description }: HeaderProps) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 min-w-0">
               {isSuperAdmin && (
-                <span className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-gold/40 bg-brand-gold/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-green">
-                  <ShieldCheck className="h-3 w-3" />
+                <span className="hidden sm:inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-gold/60 bg-brand-gold/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                  <ShieldCheck className="h-3 w-3 text-brand-gold" />
                   Super Admin
                 </span>
               )}
-              <h1 className="font-display text-sm sm:text-base font-semibold tracking-tight truncate text-foreground">
+              <h1 className={cn(
+                "font-display text-sm sm:text-base font-semibold tracking-tight truncate",
+                isDashboard ? "text-white" : "text-foreground"
+              )}>
                 {getGreeting()}, {firstName} 👋
               </h1>
             </div>
-            <p className="text-[11px] sm:text-xs text-muted-foreground truncate mt-0.5">
+            <p className={cn(
+              "text-[11px] sm:text-xs truncate mt-0.5",
+              isDashboard ? "text-white/75" : "text-muted-foreground"
+            )}>
               {COMPANY.brandLine}
             </p>
           </div>
@@ -190,6 +214,7 @@ export function Header({ title, description }: HeaderProps) {
           compactDate={!isDashboard}
           showRefresh={isDashboard}
           onRefresh={handleRefreshDashboard}
+          onDark={isDashboard}
         />
 
         {/* Notification bell */}
@@ -197,10 +222,16 @@ export function Header({ title, description }: HeaderProps) {
           variant="ghost"
           size="icon"
           onClick={() => router.push("/notifications")}
-          className="relative text-muted-foreground hover:text-foreground"
+          className={cn(
+            "relative",
+            isDashboard ? "text-white/85 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-foreground"
+          )}
         >
           <Bell className="h-5 w-5" />
-          <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-brand-gold ring-1 ring-white" />
+          <span className={cn(
+            "absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-brand-gold ring-1",
+            isDashboard ? "ring-brand-green" : "ring-white"
+          )} />
         </Button>
 
         {/* User menu */}
@@ -208,9 +239,12 @@ export function Header({ title, description }: HeaderProps) {
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="flex items-center gap-2 px-2 h-10 rounded-lg
-                         hover:bg-muted border border-transparent hover:border-border/60
-                         transition-all duration-150"
+              className={cn(
+                "flex items-center gap-2 px-2 h-10 rounded-lg transition-all duration-150",
+                isDashboard
+                  ? "text-white hover:bg-white/10 border border-white/20 hover:border-white/30"
+                  : "hover:bg-muted border border-transparent hover:border-border/60"
+              )}
             >
               <Avatar className="h-7 w-7 ring-2 ring-brand-gold/20">
                 <AvatarImage src={user?.photoURL ?? undefined} alt={displayName} />
@@ -219,16 +253,25 @@ export function Header({ title, description }: HeaderProps) {
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:flex flex-col items-start text-left max-w-[120px]">
-                <span className="text-xs font-semibold leading-none truncate text-foreground">
+                <span className={cn(
+                  "text-xs font-semibold leading-none truncate",
+                  isDashboard ? "text-white" : "text-foreground"
+                )}>
                   {displayName}
                 </span>
-                <span className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                <span className={cn(
+                  "text-[10px] mt-0.5 truncate",
+                  isDashboard ? "text-white/70" : "text-muted-foreground"
+                )}>
                   {user?.roles?.length
                     ? user.roles[0]
                     : ""}
                 </span>
               </div>
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground hidden md:block" />
+              <ChevronDown className={cn(
+                "h-3.5 w-3.5 hidden md:block",
+                isDashboard ? "text-white/70" : "text-muted-foreground"
+              )} />
             </Button>
           </DropdownMenuTrigger>
 

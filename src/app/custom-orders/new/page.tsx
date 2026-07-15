@@ -1,6 +1,17 @@
 "use client";
-import { EntityFormPage } from "@/components/erp/entity-form-page";
-import { ENTITY_MODULES } from "@/lib/erp/modules";
+
+import { useRouter } from "next/navigation";
+import { CustomOrderFormPage } from "@/components/modules/custom-orders/custom-order-form-page";
+
 export default function Page() {
-  return <EntityFormPage config={ENTITY_MODULES.customOrder} mode="create" />;
+  const router = useRouter();
+
+  return (
+    <CustomOrderFormPage
+      mode="create"
+      afterCreate={(id) => {
+        router.push(`/custom-orders/production-board?order=${id}`);
+      }}
+    />
+  );
 }

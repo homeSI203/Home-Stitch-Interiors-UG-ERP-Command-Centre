@@ -275,6 +275,8 @@ export const quotationModule: EntityConfig = {
     { key: "validUntil", label: "Valid Until", format: "date" },
     { key: "status", label: "Status", format: "badge" },
   ],
+  rowAction: "print",
+  printPath: "pdf",
 };
 
 export const proformaModule: EntityConfig = {
@@ -373,6 +375,8 @@ export const receiptModule: EntityConfig = {
     { key: "paymentMethod", label: "Method" },
     { key: "createdAt", label: "Date", format: "date" },
   ],
+  rowAction: "print",
+  printPath: "pdf",
 };
 
 export const expenseModule: EntityConfig = {
@@ -420,20 +424,24 @@ export const customOrderModule: EntityConfig = {
   managePermission: "manage_custom_orders",
   searchableFields: ["orderNumber", "customerName", "productType"],
   fields: [
-    { key: "orderNumber", label: "Order Number", type: "text", required: true },
+    { key: "orderNumber", label: "Order Number", type: "text", required: true, autoGenerate: "CO", readOnly: true },
     { key: "customerName", label: "Customer", type: "text", required: true },
+    { key: "customerPhone", label: "Phone", type: "phone" },
+    { key: "customerAddress", label: "Address", type: "text" },
     { key: "productType", label: "Product Type", type: "text", required: true },
     { key: "description", label: "Description", type: "textarea", colSpan: 2 },
     { key: "measurements", label: "Measurements", type: "textarea", colSpan: 2 },
     { key: "materials", label: "Materials", type: "textarea", colSpan: 2 },
     { key: "laborCost", label: "Labor Cost", type: "currency" },
-    { key: "materialCost", label: "Material Cost", type: "currency" },
-    { key: "total", label: "Total", type: "currency", required: true },
+    { key: "materialCost", label: "Material Cost (per meter)", type: "currency" },
+    { key: "meters", label: "Meters", type: "number", defaultValue: 1 },
+    { key: "total", label: "Total", type: "currency", required: true, readOnly: true },
     { key: "deliveryDate", label: "Delivery Date", type: "date" },
     {
       key: "productionStage",
       label: "Production Stage",
       type: "select",
+      defaultValue: "pending",
       options: [
         { label: "Pending", value: "pending" },
         { label: "Cutting", value: "cutting" },
@@ -448,9 +456,13 @@ export const customOrderModule: EntityConfig = {
     { key: "orderNumber", label: "Order #" },
     { key: "customerName", label: "Customer" },
     { key: "productType", label: "Type" },
+    { key: "meters", label: "Meters", format: "number" },
     { key: "total", label: "Total", format: "currency" },
     { key: "productionStage", label: "Stage", format: "badge" },
   ],
+  trackingBoardPath: "/custom-orders/production-board",
+  rowAction: "print",
+  printPath: "pdf",
 };
 
 export const inventoryMovementModule: EntityConfig = {
