@@ -1,16 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Loader2, CreditCard } from "lucide-react";
+import { Plus, Loader2, CreditCard, Search } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { PageHeader } from "@/components/erp/page-header";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { listInstallmentPlans, type InstallmentPlan } from "@/services/installment.service";
 import { formatTime12h } from "@/lib/utils";
 
 function fmtUGX(n: number) {
   return new Intl.NumberFormat("en-UG", { maximumFractionDigits: 0 }).format(n);
+}
+
+function matchesSearch(plan: InstallmentPlan, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const phoneQ = q.replace(/\s/g, "");
+  return (
+    plan.customerName.toLowerCase().includes(q) ||
+    (plan.customerPhone ?? "").toLowerCase().replace(/\s/g, "").includes(phoneQ) ||
+    plan.planNumber.toLowerCase().includes(q) ||
+    plan.description.toLowerCase().includes(q)
+  );
 }
 
 function StatusBadge({ status }: { status: InstallmentPlan["status"] }) {
@@ -28,10 +41,16 @@ function StatusBadge({ status }: { status: InstallmentPlan["status"] }) {
 export default function InstallmentsListPage() {
   const [plans, setPlans] = useState<InstallmentPlan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     listInstallmentPlans().then((p) => { setPlans(p); setLoading(false); });
   }, []);
+
+  const filtered = useMemo(
+    () => plans.filter((p) => matchesSearch(p, search)),
+    [plans, search]
+  );
 
   const summary = {
     total: plans.length,
@@ -44,7 +63,7 @@ export default function InstallmentsListPage() {
     <DashboardLayout title="Installments" requiredPermission="view_sales">
       <PageHeader
         title="Installment Plans"
-        description="Track partial payments on invoices and outstanding balances"
+        description="Look up a customer or plan/receipt number when they come to top up"
         actions={
           <Button asChild variant="gold">
             <Link href="/sales/installments/new">
@@ -71,6 +90,25 @@ export default function InstallmentsListPage() {
       </div>
 
       <div className="page-section">
+        {!loading && plans.length > 0 && (
+          <div className="p-4 border-b border-border/60 bg-green-tint/40">
+            <div className="relative max-w-lg">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <Input
+                autoFocus
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by customer name, phone, or plan / receipt number…"
+                className="pl-9 bg-background"
+              />
+            </div>
+            {search.trim() && (
+              <p className="text-xs text-muted-foreground font-ui mt-2">
+                {filtered.length} plan{filtered.length === 1 ? "" : "s"} matching “{search.trim()}”
+              </p>
+            )}
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-20 gap-3">
             <Loader2 className="h-6 w-6 animate-spin text-brand-gold" />
@@ -84,6 +122,12 @@ export default function InstallmentsListPage() {
               <Link href="/sales/installments/new"><Plus className="mr-1 h-3.5 w-3.5" /> Create First Plan</Link>
             </Button>
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-2 text-muted-foreground">
+            <Search className="h-8 w-8 opacity-30" />
+            <p className="font-ui text-sm">No plans matching “{search.trim()}”</p>
+            <p className="text-xs">Try the customer name or plan / receipt number.</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="data-table w-full font-ui text-sm">
@@ -95,7 +139,7 @@ export default function InstallmentsListPage() {
                 </tr>
               </thead>
               <tbody>
-                {plans.map((p) => (
+                {filtered.map((p) => (
                   <tr key={p.id}>
                     <td className="font-semibold">{p.planNumber}</td>
                     <td>
@@ -114,8 +158,10 @@ export default function InstallmentsListPage() {
                       <div>{formatTime12h(p.createdAt)}</div>
                     </td>
                     <td>
-                      <Button asChild variant="ghost" size="sm" className="font-ui text-xs">
-                        <Link href={`/sales/installments/${p.id}`}>View →</Link>
+                      <Button asChild variant={p.balance > 0 ? "gold" : "ghost"} size="sm" className="font-ui text-xs">
+                        <Link href={`/sales/installments/${p.id}`}>
+                          {p.balance > 0 ? "Top up →" : "View →"}
+                        </Link>
                       </Button>
                     </td>
                   </tr>

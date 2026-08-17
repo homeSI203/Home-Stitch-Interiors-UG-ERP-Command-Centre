@@ -145,7 +145,7 @@ export function Sidebar() {
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "hidden lg:flex flex-col h-screen bg-brand-green text-brand-beige border-r border-brand-green/20 transition-all duration-300 sticky top-0",
+          "hidden lg:flex flex-col h-screen bg-brand-green text-brand-beige border-r border-brand-green/20 transition-all duration-300 sticky top-0 print:hidden",
           isCollapsed ? "w-[72px]" : "w-64"
         )}
       >

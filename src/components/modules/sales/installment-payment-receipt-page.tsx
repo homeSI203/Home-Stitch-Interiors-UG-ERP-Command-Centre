@@ -2,38 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getEntity } from "@/services/entity.service";
-import { getCompanyProfile } from "@/services/company.service";
 import { formatCurrency, formatDate, formatTime12h, cn } from "@/lib/utils";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Loader2, Printer, ArrowLeft, LayoutTemplate } from "lucide-react";
 import { clearAutoPrintQuery, printReceiptHtml, shouldAutoPrintReceipt } from "@/lib/print-receipt";
+import { getCompanyProfile } from "@/services/company.service";
 import type { CompanyProfile } from "@/types/domain";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface SaleItem {
-  productId?: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  taxRate?: number;
-  total: number;
-}
-
-interface Sale {
-  id: string;
-  saleNumber: string;
-  customerName: string;
-  items: SaleItem[];
-  subtotal: number;
-  discount: number;
-  tax: number;
-  total: number;
-  paymentMethod: string;
-  paymentStatus: string;
-  createdAt?: { toDate?: () => Date } | string | number;
-}
+import {
+  getInstallmentPayment,
+  getInstallmentPlan,
+  listPaymentsForPlan,
+  type InstallmentPayment,
+  type InstallmentPlan,
+} from "@/services/installment.service";
 
 const FALLBACK_COMPANY: Pick<CompanyProfile, "name" | "tagline" | "phone" | "phoneSecondary" | "email" | "address" | "logoUrl"> = {
   name: "HOME STITCH INTERIORS UG",
@@ -54,6 +35,10 @@ const PAYMENT_LABELS: Record<string, string> = {
   bank: "Bank Transfer",
 };
 
+function paymentLabel(method: string) {
+  return PAYMENT_LABELS[method] ?? method;
+}
+
 function companyPhones(company: CompanyProfile) {
   const phones = [company.phone, company.phoneSecondary].filter(
     (p): p is string => Boolean(p) && !/700.?000.?000/.test(p)
@@ -65,22 +50,19 @@ function companyLogo(company: CompanyProfile) {
   return company.logoUrl || "/logos/logo-color.png";
 }
 
-function getSaleDate(sale: Sale): Date {
-  const raw = sale.createdAt;
-  if (!raw) return new Date();
-  if (typeof raw === "object" && raw !== null && "toDate" in raw && typeof raw.toDate === "function") {
-    return raw.toDate();
-  }
-  return new Date(raw as string | number);
+interface ReceiptModel {
+  plan: InstallmentPlan;
+  payment: InstallmentPayment;
+  paymentNo: number;
+  paymentCount: number;
 }
 
-// ─── Thermal Receipt ─────────────────────────────────────────────────────────
-
-function ThermalReceipt({ sale, company }: { sale: Sale; company: CompanyProfile }) {
-  const date = getSaleDate(sale);
+function ThermalInstallmentReceipt({ data, company }: { data: ReceiptModel; company: CompanyProfile }) {
+  const { plan, payment, paymentNo, paymentCount } = data;
+  const date = payment.paidAt;
+  const fullyPaid = plan.balance <= 0;
   return (
     <div className="bg-white font-mono text-[11px] leading-snug w-[300px] mx-auto p-4 border border-dashed border-gray-300 shadow-sm">
-      {/* Header */}
       <div className="text-center mb-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -93,72 +75,64 @@ function ThermalReceipt({ sale, company }: { sale: Sale; company: CompanyProfile
         <p className="text-gray-500 text-[8px] leading-tight">{company.address}</p>
         <p className="text-gray-500 text-[8px] leading-tight">{companyPhones(company)}</p>
         <div className="border-t border-dashed border-gray-400 my-2" />
-        <p className="font-semibold text-[12px]">RECEIPT</p>
-        <p className="text-gray-500">{sale.saleNumber}</p>
+        <p className="font-semibold text-[12px]">INSTALLMENT RECEIPT</p>
+        <p className="text-gray-500">{plan.planNumber}</p>
         <p className="text-gray-500">{date.toLocaleDateString("en-UG")} {formatTime12h(date)}</p>
       </div>
 
-      {/* Customer */}
       <div className="mb-2 border-t border-dashed border-gray-400 pt-2">
-        <p>Customer: <span className="font-semibold">{sale.customerName || "Walk-in"}</span></p>
-        <p>Payment: <span className="font-semibold">{PAYMENT_LABELS[sale.paymentMethod] ?? sale.paymentMethod}</span></p>
+        <p>Customer: <span className="font-semibold">{plan.customerName || "Walk-in"}</span></p>
+        {plan.customerPhone && <p>Phone: <span className="font-semibold">{plan.customerPhone}</span></p>}
+        <p>Payment: <span className="font-semibold">{paymentLabel(payment.paymentMethod)}</span></p>
+        <p>Instalment: <span className="font-semibold">{paymentNo} of {paymentCount}</span></p>
       </div>
 
-      {/* Items */}
       <div className="border-t border-dashed border-gray-400 pt-2 mb-2">
-        <div className="grid grid-cols-12 font-bold mb-1">
-          <span className="col-span-6">Item</span>
-          <span className="col-span-2 text-right">Qty</span>
-          <span className="col-span-4 text-right">Total</span>
-        </div>
-        {(sale.items ?? []).map((item, i) => (
-          <div key={i} className="grid grid-cols-12 mb-1">
-            <div className="col-span-12 truncate">{item.description}</div>
-            <div className="col-span-6 text-gray-500 pl-1 text-[10px]">
-              @ {formatCurrency(item.unitPrice)}
-              {item.taxRate ? ` +${item.taxRate}% tax` : ""}
-            </div>
-            <span className="col-span-2 text-right">{item.quantity}</span>
-            <span className="col-span-4 text-right">{formatCurrency(item.total)}</span>
-          </div>
-        ))}
+        <p className="text-gray-500 mb-1">Items / Description</p>
+        <p className="font-semibold">{plan.description}</p>
       </div>
 
-      {/* Totals */}
       <div className="border-t border-dashed border-gray-400 pt-2 space-y-0.5">
-        <div className="flex justify-between">
-          <span>Subtotal</span><span>{formatCurrency(sale.subtotal)}</span>
+        <div className="flex justify-between font-bold text-[13px]">
+          <span>THIS PAYMENT</span>
+          <span>{formatCurrency(payment.amount)}</span>
         </div>
-        {sale.discount > 0 && (
-          <div className="flex justify-between text-green-700">
-            <span>Discount</span><span>-{formatCurrency(sale.discount)}</span>
-          </div>
-        )}
         <div className="flex justify-between">
-          <span>Tax</span><span>{formatCurrency(sale.tax)}</span>
+          <span>Invoice total</span>
+          <span>{formatCurrency(plan.totalAmount)}</span>
         </div>
-        <div className="flex justify-between font-bold text-[13px] border-t border-dashed border-gray-400 pt-1 mt-1">
-          <span>TOTAL</span><span>{formatCurrency(sale.total)}</span>
+        <div className="flex justify-between text-green-700">
+          <span>Amount paid</span>
+          <span>{formatCurrency(plan.amountPaid)}</span>
+        </div>
+        <div className="flex justify-between font-bold border-t border-dashed border-gray-400 pt-1 mt-1">
+          <span>BALANCE</span>
+          <span>{formatCurrency(plan.balance)}</span>
         </div>
       </div>
 
-      {/* Footer */}
+      {(payment.receivedBy || payment.notes) && (
+        <div className="border-t border-dashed border-gray-400 pt-2 mt-2">
+          {payment.receivedBy && <p>Received by: <span className="font-semibold">{payment.receivedBy}</span></p>}
+          {payment.notes && <p>Notes: {payment.notes}</p>}
+        </div>
+      )}
+
       <div className="text-center mt-4 border-t border-dashed border-gray-400 pt-3 text-gray-500">
         <p>Thank you for your business!</p>
         <p className="mt-1">{company.email}</p>
-        <p className="mt-2 text-[10px]">*** {sale.paymentStatus?.toUpperCase()} ***</p>
+        <p className="mt-2 text-[10px]">*** {fullyPaid ? "PAID IN FULL" : "PARTIAL PAYMENT"} ***</p>
       </div>
     </div>
   );
 }
 
-// ─── A4 Receipt ──────────────────────────────────────────────────────────────
-
-function A4Receipt({ sale, company }: { sale: Sale; company: CompanyProfile }) {
-  const date = getSaleDate(sale);
+function A4InstallmentReceipt({ data, company }: { data: ReceiptModel; company: CompanyProfile }) {
+  const { plan, payment, paymentNo, paymentCount } = data;
+  const date = payment.paidAt;
+  const fullyPaid = plan.balance <= 0;
   return (
     <div className="bg-white w-full max-w-[794px] mx-auto shadow-lg print:shadow-none p-10">
-      {/* Header */}
       <div className="flex justify-between items-start mb-8">
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -177,84 +151,65 @@ function A4Receipt({ sale, company }: { sale: Sale; company: CompanyProfile }) {
           <div className="inline-block bg-emerald-600 text-white text-lg font-black px-6 py-2 rounded-lg tracking-widest mb-3">
             RECEIPT
           </div>
-          <p className="text-gray-700 font-semibold text-sm">{sale.saleNumber}</p>
+          <p className="text-gray-700 font-semibold text-sm">{plan.planNumber}</p>
+          <p className="text-gray-500 text-sm">Instalment {paymentNo} of {paymentCount}</p>
           <p className="text-gray-500 text-sm">{formatDate(date)}</p>
           <p className="text-gray-500 text-sm">{formatTime12h(date)}</p>
         </div>
       </div>
 
-      {/* Customer info */}
       <div className="grid grid-cols-2 gap-6 mb-8 bg-gray-50 rounded-lg p-4 border border-gray-200">
         <div>
           <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Customer</p>
-          <p className="font-semibold text-gray-900">{sale.customerName || "Walk-in Customer"}</p>
+          <p className="font-semibold text-gray-900">{plan.customerName || "Walk-in Customer"}</p>
+          {plan.customerPhone && <p className="text-sm text-gray-600">{plan.customerPhone}</p>}
         </div>
         <div>
           <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Payment Method</p>
-          <p className="font-semibold text-gray-900">{PAYMENT_LABELS[sale.paymentMethod] ?? sale.paymentMethod}</p>
+          <p className="font-semibold text-gray-900">{paymentLabel(payment.paymentMethod)}</p>
         </div>
         <div>
           <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Status</p>
           <span className={cn(
             "inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase",
-            sale.paymentStatus === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+            fullyPaid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
           )}>
-            {sale.paymentStatus}
+            {fullyPaid ? "Paid in full" : "Partial payment"}
           </span>
         </div>
         <div>
-          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Date & Time</p>
-          <p className="font-semibold text-gray-900">{formatDate(date)} · {formatTime12h(date)}</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Received By</p>
+          <p className="font-semibold text-gray-900">{payment.receivedBy || "—"}</p>
         </div>
       </div>
 
-      {/* Items table */}
-      <table className="w-full text-sm mb-6">
-        <thead>
-          <tr className="bg-gray-900 text-white">
-            <th className="text-left py-2 px-3 rounded-tl-md">#</th>
-            <th className="text-left py-2 px-3">Item</th>
-            <th className="text-right py-2 px-3">Unit Price</th>
-            <th className="text-right py-2 px-3">Qty</th>
-            <th className="text-right py-2 px-3">Tax</th>
-            <th className="text-right py-2 px-3 rounded-tr-md">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(sale.items ?? []).map((item, i) => (
-            <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-              <td className="py-2 px-3 text-gray-400">{i + 1}</td>
-              <td className="py-2 px-3 font-medium text-gray-900">{item.description}</td>
-              <td className="py-2 px-3 text-right text-gray-700">{formatCurrency(item.unitPrice)}</td>
-              <td className="py-2 px-3 text-right text-gray-700">{item.quantity}</td>
-              <td className="py-2 px-3 text-right text-gray-500">{item.taxRate ? `${item.taxRate}%` : "—"}</td>
-              <td className="py-2 px-3 text-right font-semibold text-gray-900">{formatCurrency(item.total)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="mb-6">
+        <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Items / Description</p>
+        <p className="font-medium text-gray-900">{plan.description}</p>
+        {payment.notes && <p className="text-sm text-gray-500 mt-1">Notes: {payment.notes}</p>}
+      </div>
 
-      {/* Totals */}
       <div className="flex justify-end mb-8">
         <div className="w-64 space-y-1.5 text-sm">
-          <div className="flex justify-between text-gray-600">
-            <span>Subtotal</span><span>{formatCurrency(sale.subtotal)}</span>
+          <div className="flex justify-between font-bold text-base text-gray-900">
+            <span>This payment</span>
+            <span className="text-emerald-700">{formatCurrency(payment.amount)}</span>
           </div>
-          {sale.discount > 0 && (
-            <div className="flex justify-between text-emerald-700">
-              <span>Discount</span><span>-{formatCurrency(sale.discount)}</span>
-            </div>
-          )}
           <div className="flex justify-between text-gray-600">
-            <span>Tax</span><span>{formatCurrency(sale.tax)}</span>
+            <span>Invoice total</span><span>{formatCurrency(plan.totalAmount)}</span>
+          </div>
+          <div className="flex justify-between text-emerald-700">
+            <span>Amount paid</span><span>{formatCurrency(plan.amountPaid)}</span>
           </div>
           <div className="flex justify-between font-bold text-base text-gray-900 border-t border-gray-300 pt-2 mt-2">
-            <span>Grand Total</span><span className="text-emerald-700">{formatCurrency(sale.total)}</span>
+            <span>Balance</span>
+            <span className={fullyPaid ? "text-emerald-700" : "text-amber-700"}>
+              {formatCurrency(plan.balance)}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Footer */}
       <div className="border-t border-gray-200 pt-4 text-center text-gray-500 text-xs">
         <p className="font-semibold text-gray-700 mb-1">Thank you for choosing {company.name}!</p>
         <p>{company.email} · {companyPhones(company)}</p>
@@ -264,56 +219,53 @@ function A4Receipt({ sale, company }: { sale: Sale; company: CompanyProfile }) {
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
-export function SaleReceiptPage() {
-  const params = useParams<{ id: string }>();
+export function InstallmentPaymentReceiptPage() {
+  const params = useParams<{ id: string; paymentId: string }>();
   const router = useRouter();
   const printRef = useRef<HTMLDivElement>(null);
-  const [sale, setSale] = useState<Sale | null>(null);
+  const [data, setData] = useState<ReceiptModel | null>(null);
   const [company, setCompany] = useState<CompanyProfile>(FALLBACK_COMPANY as CompanyProfile);
   const [loading, setLoading] = useState(true);
   const [format, setFormat] = useState<"thermal" | "a4">("thermal");
 
   useEffect(() => {
-    if (!params?.id) return;
+    if (!params?.id || !params?.paymentId) return;
     Promise.all([
-      getEntity<Record<string, unknown>>("sales", params.id),
+      getInstallmentPlan(params.id),
+      getInstallmentPayment(params.paymentId),
+      listPaymentsForPlan(params.id),
       getCompanyProfile(),
-    ]).then(([data, co]) => {
-      if (data) {
-        setSale({
-          id: String(data.id ?? ""),
-          saleNumber: String(data.saleNumber ?? ""),
-          customerName: String(data.customerName ?? ""),
-          items: Array.isArray(data.items) ? (data.items as SaleItem[]) : [],
-          subtotal: Number(data.subtotal ?? 0),
-          discount: Number(data.discount ?? 0),
-          tax: Number(data.tax ?? 0),
-          total: Number(data.total ?? 0),
-          paymentMethod: String(data.paymentMethod ?? "cash"),
-          paymentStatus: String(data.paymentStatus ?? "paid"),
-          createdAt: data.createdAt as Sale["createdAt"],
+    ]).then(([plan, payment, payments, co]) => {
+      if (plan && payment && payment.planId === plan.id) {
+        const chronological = [...payments].sort(
+          (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+        );
+        const paymentNo = Math.max(1, chronological.findIndex((p) => p.id === payment.id) + 1);
+        setData({
+          plan,
+          payment,
+          paymentNo,
+          paymentCount: chronological.length,
         });
       }
       setCompany(co);
       setLoading(false);
     });
-  }, [params?.id]);
+  }, [params?.id, params?.paymentId]);
 
   const handlePrint = useCallback(() => {
     const area = printRef.current;
-    if (!area || !sale) return;
+    if (!area || !data) return;
     printReceiptHtml({
       html: area.innerHTML,
-      title: sale.saleNumber || "Receipt",
+      title: `${data.plan.planNumber} instalment ${data.paymentNo}`,
       format,
     });
-  }, [sale, format]);
+  }, [data, format]);
 
   const didAutoPrint = useRef(false);
   useEffect(() => {
-    if (!sale || loading || didAutoPrint.current) return;
+    if (!data || loading || didAutoPrint.current) return;
     if (!shouldAutoPrintReceipt()) return;
     didAutoPrint.current = true;
     const timer = window.setTimeout(() => {
@@ -321,21 +273,19 @@ export function SaleReceiptPage() {
       clearAutoPrintQuery();
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [sale, loading, handlePrint]);
+  }, [data, loading, handlePrint]);
 
   return (
-    <DashboardLayout title="Receipt" requiredPermission="view_sales">
-      {/* ── Actions bar (hidden on print) ── */}
+    <DashboardLayout title="Installment Receipt" requiredPermission="view_sales">
       <div className="print:hidden flex items-center gap-3 mb-6">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => router.push(`/sales/installments/${params.id}`)}
           className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900"
         >
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
         <div className="flex-1" />
-        {/* Format toggle */}
         <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
           <button
             type="button"
@@ -374,23 +324,21 @@ export function SaleReceiptPage() {
         </button>
       </div>
 
-      {/* ── Receipt ── */}
       <div ref={printRef}>
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
           </div>
-        ) : sale ? (
+        ) : data ? (
           format === "thermal" ? (
-            <ThermalReceipt sale={sale} company={company} />
+            <ThermalInstallmentReceipt data={data} company={company} />
           ) : (
-            <A4Receipt sale={sale} company={company} />
+            <A4InstallmentReceipt data={data} company={company} />
           )
         ) : (
           <p className="text-center text-gray-400 py-20">Receipt not found.</p>
         )}
       </div>
-
     </DashboardLayout>
   );
 }

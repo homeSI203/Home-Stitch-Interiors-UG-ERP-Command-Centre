@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Barcode,
   ChevronDown,
@@ -12,9 +13,11 @@ import {
   Trash2,
   User,
   X,
+  CreditCard,
 } from "lucide-react";
 import { cn, formatCurrency, formatTime12h } from "@/lib/utils";
 import { createEntity, listEntities } from "@/services/entity.service";
+import { listInstallmentPlans, type InstallmentPlan } from "@/services/installment.service";
 import { useAuth } from "@/hooks/use-auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 
@@ -220,6 +223,112 @@ function ProductPicker({
   );
 }
 
+// ─── Installment lookup (top-up search) ──────────────────────────────────────
+
+function InstallmentLookup({
+  onClose,
+  onOpenPlan,
+}: {
+  onClose: () => void;
+  onOpenPlan: (id: string) => void;
+}) {
+  const [plans, setPlans] = useState<InstallmentPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    listInstallmentPlans()
+      .then(setPlans)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const q = search.trim().toLowerCase();
+  const phoneQ = q.replace(/\s/g, "");
+  const filtered = q
+    ? plans.filter((p) =>
+        p.customerName.toLowerCase().includes(q) ||
+        (p.customerPhone ?? "").toLowerCase().replace(/\s/g, "").includes(phoneQ) ||
+        p.planNumber.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q)
+      )
+    : plans.filter((p) => p.balance > 0).slice(0, 12);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b">
+          <div>
+            <h2 className="font-bold text-lg">Find Installment</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Search to top up a customer plan</p>
+          </div>
+          <button type="button" onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="p-3 border-b">
+          <input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Customer name or plan / receipt number…"
+            className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+        </div>
+        <div className="overflow-y-auto flex-1">
+          {loading ? (
+            <div className="flex items-center justify-center py-12 gap-2 text-gray-500">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading plans…
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="py-12 text-center text-gray-400 text-sm">
+              {q ? `No plans matching “${search.trim()}”` : "No outstanding installment plans"}
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-gray-50">
+                <tr className="border-b text-gray-600">
+                  <th className="text-left py-2 px-3">Plan #</th>
+                  <th className="text-left py-2 px-3">Customer</th>
+                  <th className="text-right py-2 px-3">Balance</th>
+                  <th className="text-left py-2 px-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p) => (
+                  <tr
+                    key={p.id}
+                    onClick={() => onOpenPlan(p.id)}
+                    className="border-b hover:bg-amber-50 cursor-pointer"
+                  >
+                    <td className="py-2 px-3 font-semibold">{p.planNumber}</td>
+                    <td className="py-2 px-3">
+                      <div>{p.customerName}</div>
+                      {p.customerPhone && <div className="text-xs text-gray-400">{p.customerPhone}</div>}
+                    </td>
+                    <td className={cn("py-2 px-3 text-right font-bold", p.balance > 0 ? "text-red-600" : "text-emerald-600")}>
+                      {formatCurrency(p.balance)}
+                    </td>
+                    <td className="py-2 px-3 capitalize text-gray-500">{p.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="p-3 border-t flex justify-between">
+          <Link href="/sales/installments" className="text-xs text-blue-600 hover:underline px-2 py-1">
+            View all plans
+          </Link>
+          <Link href="/sales/installments/new" className="text-xs font-semibold text-amber-700 hover:underline px-2 py-1">
+            + New plan
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Toolbar Button ──────────────────────────────────────────────────────────
 
 function ToolbarButton({
@@ -270,6 +379,7 @@ export function PosPage() {
   const [showCustomer, setShowCustomer] = useState(false);
   const [showPayWidget, setShowPayWidget] = useState(false);
   const [mobileMoneyStep, setMobileMoneyStep] = useState(false);
+  const [showInstallments, setShowInstallments] = useState(false);
 
   const now = new Date();
   const timeStr = formatTime12h(now, true);
@@ -437,11 +547,12 @@ export function PosPage() {
       await createEntity("receipts", {
         receiptNumber: `RCT-${Date.now()}`,
         saleId: id,
+        saleNumber,
         customerName,
         amount: grandTotal,
         paymentMethod: chosenMethod,
       });
-      router.push(`/sales/${id}/receipt`);
+      router.push(`/sales/${id}/receipt?autoprint=1`);
     } finally {
       setSaving(false);
     }
@@ -463,6 +574,11 @@ export function PosPage() {
       <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-200">
         <ToolbarButton label="Products" icon={<ShoppingCart className="h-4 w-4" />} onClick={() => setShowPicker(true)} />
         <ToolbarButton label="Customer" icon={<User className="h-4 w-4" />} onClick={() => setShowCustomer(true)} />
+        <ToolbarButton
+          label="Installments"
+          icon={<CreditCard className="h-4 w-4" />}
+          onClick={() => setShowInstallments(true)}
+        />
         <button
           type="button"
           onClick={() => { if (cart.length > 0) { setMobileMoneyStep(false); setShowPayWidget(true); } }}
@@ -687,6 +803,13 @@ export function PosPage() {
         />
       )}
 
+      {showInstallments && (
+        <InstallmentLookup
+          onClose={() => setShowInstallments(false)}
+          onOpenPlan={(id) => router.push(`/sales/installments/${id}`)}
+        />
+      )}
+
       {/* ── Payment Method Widget ── */}
       {showPayWidget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -710,11 +833,17 @@ export function PosPage() {
                     { value: "mobile_money", label: "Mobile Money",  emoji: "📱" },
                     { value: "card",         label: "Card",          emoji: "💳" },
                     { value: "bank",         label: "Bank Transfer", emoji: "🏦" },
+                    { value: "installment",  label: "Installment",   emoji: "📅" },
                   ].map((m) => (
                     <button
                       key={m.value}
                       type="button"
                       onClick={() => {
+                        if (m.value === "installment") {
+                          setShowPayWidget(false);
+                          router.push("/sales/installments/new");
+                          return;
+                        }
                         if (m.value === "mobile_money") {
                           setMobileMoneyStep(true);
                         } else {

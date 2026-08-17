@@ -125,7 +125,7 @@ export function Header({ title, description }: HeaderProps) {
 
   return (
     <header className={cn(
-      "sticky top-0 z-40 flex items-center justify-between gap-3",
+      "sticky top-0 z-40 flex items-center justify-between gap-3 print:hidden",
       isDashboard ? "min-h-[72px] py-2" : "h-15 min-h-[60px]",
       "border-b backdrop-blur-md px-4 lg:px-6 shadow-sm",
       isDashboard

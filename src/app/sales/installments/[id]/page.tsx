@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, CreditCard, CheckCircle2, AlertCircle, Receipt } from "lucide-react";
+import { ArrowLeft, Loader2, CreditCard, CheckCircle2, AlertCircle, Receipt, Printer } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +58,7 @@ const METHODS = [
 
 export default function InstallmentDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const { user } = useAuth();
 
   const [plan, setPlan]         = useState<InstallmentPlan | null>(null);
@@ -97,7 +98,7 @@ export default function InstallmentDetailPage() {
     setError(null);
     setSuccess(null);
     try {
-      await recordPayment(id, {
+      const paymentId = await recordPayment(id, {
         amount: amt,
         paymentMethod: method,
         notes: notes || undefined,
@@ -106,7 +107,7 @@ export default function InstallmentDetailPage() {
       setSuccess(`UGX ${fmtUGX(amt)} recorded via ${methodLabel(method)}.`);
       setAmount("");
       setNotes("");
-      await reload();
+      router.push(`/sales/installments/${id}/payments/${paymentId}/receipt?autoprint=1`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to record payment");
     } finally {
@@ -274,8 +275,8 @@ export default function InstallmentDetailPage() {
                 <table className="data-table w-full font-ui text-sm">
                   <thead>
                     <tr>
-                      {["#", "Date & Time", "Method", "Amount (UGX)", "Notes", "Received By"].map((h) => (
-                        <th key={h}>{h}</th>
+                      {["#", "Date & Time", "Method", "Amount (UGX)", "Notes", "Received By", ""].map((h) => (
+                        <th key={h || "print"}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -298,6 +299,16 @@ export default function InstallmentDetailPage() {
                         </td>
                         <td className="text-muted-foreground text-xs">{pmt.notes ?? "—"}</td>
                         <td className="text-muted-foreground text-xs">{pmt.receivedBy ?? "—"}</td>
+                        <td className="text-right">
+                          <Link
+                            href={`/sales/installments/${id}/payments/${pmt.id}/receipt`}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-brand-gold hover:underline"
+                            title="Print receipt"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            Print
+                          </Link>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -309,7 +320,7 @@ export default function InstallmentDetailPage() {
                       <td className="px-4 py-2 tabular-nums font-bold text-brand-green text-right">
                         {fmtUGX(plan.amountPaid)}
                       </td>
-                      <td colSpan={2} />
+                      <td colSpan={3} />
                     </tr>
                   </tfoot>
                 </table>

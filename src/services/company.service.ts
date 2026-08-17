@@ -39,7 +39,9 @@ export async function getCompanyProfile(): Promise<CompanyProfile> {
     tagline: (data.tagline as string) ?? DEFAULT_PROFILE.tagline,
     logoUrl: data.logoUrl as string | undefined,
     email: (data.email as string) ?? DEFAULT_PROFILE.email,
-    phone: (data.phone as string) ?? DEFAULT_PROFILE.phone,
+    phone: /700.?000.?000/.test(String(data.phone ?? ""))
+      ? DEFAULT_PROFILE.phone
+      : (data.phone as string) ?? DEFAULT_PROFILE.phone,
     phoneSecondary: data.phoneSecondary as string | undefined,
     address: (data.address as string) ?? DEFAULT_PROFILE.address,
     taxId: data.taxId as string | undefined,

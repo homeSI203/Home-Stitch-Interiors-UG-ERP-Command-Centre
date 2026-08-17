@@ -1,5 +1,7 @@
 "use client";
-import { DocumentPdfPage } from "@/components/erp/document-pdf-page";
+
+import { ReceiptPdfPage } from "@/components/modules/receipts/receipt-pdf-page";
+
 export default function Page() {
-  return <DocumentPdfPage docType="receipt" permission="view_receipts" />;
+  return <ReceiptPdfPage />;
 }

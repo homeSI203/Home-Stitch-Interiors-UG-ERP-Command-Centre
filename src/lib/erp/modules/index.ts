@@ -371,12 +371,16 @@ export const receiptModule: EntityConfig = {
   listColumns: [
     { key: "receiptNumber", label: "Receipt #" },
     { key: "customerName", label: "Customer" },
-    { key: "amount", label: "Amount", format: "currency" },
-    { key: "paymentMethod", label: "Method" },
-    { key: "createdAt", label: "Date", format: "date" },
+    { key: "amount", label: "Total", format: "currency" },
+    { key: "paymentMethod", label: "Payment" },
+    { key: "createdAt", label: "Date & Time", format: "datetime" },
   ],
   rowAction: "print",
   printPath: "pdf",
+  printHref: (row) =>
+    row.saleId
+      ? `/sales/${String(row.saleId)}/receipt`
+      : `/receipts/${String(row.id)}/pdf`,
 };
 
 export const expenseModule: EntityConfig = {

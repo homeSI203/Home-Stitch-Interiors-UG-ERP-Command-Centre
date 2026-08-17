@@ -265,7 +265,11 @@ export function EntityListPage({ config }: { config: EntityConfig }) {
                           <Button asChild variant="ghost" size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-brand-green hover:bg-brand-green/10"
                             title="Print">
-                            <Link href={`${config.basePath}/${row.id}/${config.printPath ?? "receipt"}`}>
+                            <Link href={
+                              config.printHref
+                                ? config.printHref(row)
+                                : `${config.basePath}/${row.id}/${config.printPath ?? "receipt"}`
+                            }>
                               <Printer className="h-3.5 w-3.5" />
                             </Link>
                           </Button>

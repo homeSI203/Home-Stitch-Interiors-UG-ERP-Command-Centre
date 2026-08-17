@@ -250,6 +250,13 @@ async function completeInstallmentPlanIfNeeded(planId: string): Promise<void> {
 
 // ─── Payments ─────────────────────────────────────────────────────────────────
 
+export async function getInstallmentPayment(paymentId: string): Promise<InstallmentPayment | null> {
+  const db = getFirebaseDb();
+  const snap = await getDoc(doc(db, "installmentPayments", paymentId));
+  if (!snap.exists()) return null;
+  return toPayment(snap.id, snap.data() as Record<string, unknown>);
+}
+
 export async function listPaymentsForPlan(planId: string): Promise<InstallmentPayment[]> {
   const db = getFirebaseDb();
   const snap = await getDocs(

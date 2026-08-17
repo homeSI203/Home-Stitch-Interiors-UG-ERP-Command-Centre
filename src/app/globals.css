@@ -252,6 +252,12 @@
 .animate-fade-in   { animation: fade-in 0.35s ease-out both; }
 .animate-slide-in  { animation: slide-in-right 0.3s ease-out both; }
 
+@media print {
+  aside, header { display: none !important; }
+  main { padding: 0 !important; overflow: visible !important; background: white !important; }
+}
+
+
 /* Staggered children */
 .stagger > *:nth-child(1)  { animation-delay: 0ms; }
 .stagger > *:nth-child(2)  { animation-delay: 60ms; }

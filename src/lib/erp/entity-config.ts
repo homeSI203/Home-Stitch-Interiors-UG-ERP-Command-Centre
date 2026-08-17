@@ -66,6 +66,8 @@ export interface EntityConfig {
   rowAction?: "archive" | "print";
   /** URL segment for print action. Defaults to "receipt" (sales) or use "pdf" for documents. */
   printPath?: string;
+  /** Custom print URL per row (e.g. receipts that belong to a sale) */
+  printHref?: (row: Record<string, unknown>) => string;
   /** Hide the edit button on list rows */
   hideEdit?: boolean;
   /** Kanban / production board URL for order tracking */
