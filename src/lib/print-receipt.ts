@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+
 const RECEIPT_PRINT_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Roboto+Mono:wght@400;700&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -98,21 +102,44 @@ table { border-collapse: collapse; width: 100%; }
 th, td { padding: 0.5rem 0.75rem; }
 `;
 
+export const A4_SHEET_PRINT_STYLES = `
+@page { size: A4 portrait; margin: 14mm 14mm; }
+* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: Arial, sans-serif; font-size: 11pt; color: #4A1E0A; margin: 0; }
+table { border-collapse: collapse; width: 100%; }
+img { max-width: 100%; }
+`;
+
+export function printHtmlDocument(opts: {
+  html: string;
+  title: string;
+  styles: string;
+}) {
+  const origin = window.location.origin;
+  const html = opts.html.replace(/src="(\/[^"]+)"/g, `src="${origin}$1"`);
+  const title = opts.title.replace(/[<>]/g, "");
+  printViaIframe(`<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${title}</title>
+    <style>${opts.styles}</style>
+  </head>
+  <body>${html}</body>
+</html>`);
+}
+
 export function printReceiptHtml(opts: {
   html: string;
   title: string;
   format: "thermal" | "a4";
 }) {
-  const origin = window.location.origin;
-  const html = opts.html.replace(/src="(\/[^"]+)"/g, `src="${origin}$1"`);
   const { title, format } = opts;
   const isA4 = format === "a4";
-  const documentHtml = `<!DOCTYPE html>
-<html>
-  <head>
-    <title>${title}</title>
-    <meta charset="utf-8" />
-    <style>
+  printHtmlDocument({
+    html: opts.html,
+    title,
+    styles: `
       ${RECEIPT_PRINT_CSS}
       body {
         font-family: ${isA4 ? "'Inter', sans-serif" : "'Roboto Mono', monospace"};
@@ -125,11 +152,11 @@ export function printReceiptHtml(opts: {
         size: ${isA4 ? "A4 portrait" : "80mm auto"};
         margin: ${isA4 ? "15mm" : "4mm"};
       }
-    </style>
-  </head>
-  <body>${html}</body>
-</html>`;
+    `,
+  });
+}
 
+function printViaIframe(documentHtml: string) {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.position = "fixed";
@@ -174,6 +201,16 @@ function fallbackPopupPrint(documentHtml: string) {
   }, 400);
 }
 
+export function withAutoPrint(path: string) {
+  if (!path) return path;
+  const hashIdx = path.indexOf("#");
+  const hash = hashIdx >= 0 ? path.slice(hashIdx) : "";
+  const base = hashIdx >= 0 ? path.slice(0, hashIdx) : path;
+  if (/(?:^|[?&])autoprint=/.test(base)) return path;
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}autoprint=1${hash}`;
+}
+
 export function shouldAutoPrintReceipt(): boolean {
   if (typeof window === "undefined") return false;
   return new URLSearchParams(window.location.search).get("autoprint") === "1";
@@ -181,5 +218,23 @@ export function shouldAutoPrintReceipt(): boolean {
 
 export function clearAutoPrintQuery() {
   if (typeof window === "undefined") return;
-  window.history.replaceState({}, "", window.location.pathname);
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("autoprint")) return;
+  url.searchParams.delete("autoprint");
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  window.history.replaceState({}, "", next);
+}
+
+export function useAutoPrint(ready: boolean, printFn: () => void) {
+  const did = useRef(false);
+  useEffect(() => {
+    if (!ready || did.current) return;
+    if (!shouldAutoPrintReceipt()) return;
+    did.current = true;
+    const timer = window.setTimeout(() => {
+      printFn();
+      clearAutoPrintQuery();
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [ready, printFn]);
 }

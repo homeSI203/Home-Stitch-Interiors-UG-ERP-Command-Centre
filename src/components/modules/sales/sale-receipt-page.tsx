@@ -7,7 +7,7 @@ import { getCompanyProfile } from "@/services/company.service";
 import { formatCurrency, formatDate, formatTime12h, cn } from "@/lib/utils";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Loader2, Printer, ArrowLeft, LayoutTemplate } from "lucide-react";
-import { clearAutoPrintQuery, printReceiptHtml, shouldAutoPrintReceipt } from "@/lib/print-receipt";
+import { printReceiptHtml, useAutoPrint } from "@/lib/print-receipt";
 import type { CompanyProfile } from "@/types/domain";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ const PAYMENT_LABELS: Record<string, string> = {
 
 function companyPhones(company: CompanyProfile) {
   const phones = [company.phone, company.phoneSecondary].filter(
-    (p): p is string => Boolean(p) && !/700.?000.?000/.test(p)
+    (p): p is string => typeof p === "string" && p.length > 0 && !/700.?000.?000/.test(p)
   );
   return phones.join(" / ") || "+256 757 148631 / +256 754 604928";
 }
@@ -311,17 +311,7 @@ export function SaleReceiptPage() {
     });
   }, [sale, format]);
 
-  const didAutoPrint = useRef(false);
-  useEffect(() => {
-    if (!sale || loading || didAutoPrint.current) return;
-    if (!shouldAutoPrintReceipt()) return;
-    didAutoPrint.current = true;
-    const timer = window.setTimeout(() => {
-      handlePrint();
-      clearAutoPrintQuery();
-    }, 450);
-    return () => window.clearTimeout(timer);
-  }, [sale, loading, handlePrint]);
+  useAutoPrint(!loading && !!sale, handlePrint);
 
   return (
     <DashboardLayout title="Receipt" requiredPermission="view_sales">

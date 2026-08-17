@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Printer, ArrowLeft } from "lucide-react";
+import { A4_SHEET_PRINT_STYLES, printHtmlDocument, useAutoPrint } from "@/lib/print-receipt";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { getEntity } from "@/services/entity.service";
@@ -256,31 +257,17 @@ export function ProformaDocumentPage() {
     });
   }, [id]);
 
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     const el = document.getElementById("proforma-print");
     if (!el) return;
-    const w = window.open("", "_blank", "width=794,height=1123");
-    if (!w) return;
-    w.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8"/>
-        <title>Proforma Invoice</title>
-        <style>
-          @page { size: A4 portrait; margin: 18mm 16mm; }
-          * { box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; margin: 0; }
-          table { border-collapse: collapse; width: 100%; }
-          @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-        </style>
-      </head>
-      <body>${el.innerHTML}</body>
-      </html>
-    `);
-    w.document.close();
-    w.onload = () => { w.print(); };
-  };
+    printHtmlDocument({
+      html: el.innerHTML,
+      title: "Proforma Invoice",
+      styles: A4_SHEET_PRINT_STYLES,
+    });
+  }, []);
+
+  useAutoPrint(!loading && !!data, handlePrint);
 
   const docNumber = data?.proformaNumber ?? data?.quotationNumber ?? id;
 

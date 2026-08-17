@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Printer } from "lucide-react";
+import { A4_SHEET_PRINT_STYLES, printHtmlDocument, useAutoPrint } from "@/lib/print-receipt";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { getEntity } from "@/services/entity.service";
@@ -425,29 +426,17 @@ export function CustomOrderPdfPage() {
 
   const orderNumber = data ? String(data.orderNumber ?? id) : id;
 
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     const el = document.getElementById("custom-order-print");
     if (!el) return;
-    const w = window.open("", "_blank", "width=794,height=1123");
-    if (!w) return;
+    printHtmlDocument({
+      html: el.innerHTML,
+      title: `Custom Order ${orderNumber}`,
+      styles: A4_SHEET_PRINT_STYLES,
+    });
+  }, [orderNumber]);
 
-    const origin = window.location.origin;
-    const html = el.innerHTML.replace(/src="(\/[^"]+)"/g, `src="${origin}$1"`);
-
-    w.document.write(`<!DOCTYPE html><html><head>
-      <meta charset="utf-8"/>
-      <title>Custom Order ${orderNumber}</title>
-      <style>
-        @page { size: A4 portrait; margin: 14mm 14mm; }
-        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        body { font-family: Arial, sans-serif; font-size: 11pt; color: #4A1E0A; margin: 0; }
-        table { border-collapse: collapse; width: 100%; }
-        img { max-width: 100%; }
-      </style>
-    </head><body>${html}</body></html>`);
-    w.document.close();
-    w.onload = () => w.print();
-  };
+  useAutoPrint(!loading && !!data, handlePrint);
 
   return (
     <DashboardLayout title="Custom Order PDF" requiredPermission="view_custom_orders">

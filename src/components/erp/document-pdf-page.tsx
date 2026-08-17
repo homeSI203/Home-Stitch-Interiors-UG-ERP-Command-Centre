@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Printer } from "lucide-react";
+import { useAutoPrint } from "@/lib/print-receipt";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,7 +47,8 @@ export function DocumentPdfPage({
     });
   }, [config.collection, id]);
 
-  const handlePrint = () => window.print();
+  const handlePrint = useCallback(() => window.print(), []);
+  useAutoPrint(!loading && !!data, handlePrint);
 
   const docNumber =
     data?.quotationNumber ??

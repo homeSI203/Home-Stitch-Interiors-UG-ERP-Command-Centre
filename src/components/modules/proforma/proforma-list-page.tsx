@@ -16,6 +16,7 @@ import {
   exportToCsv,
 } from "@/services/entity.service";
 import type { LineItem } from "@/components/modules/documents/document-form";
+import { withAutoPrint } from "@/lib/print-receipt";
 
 const PAGE_SIZE = 15;
 
@@ -251,7 +252,7 @@ export function ProformaListPage() {
                           </Button>
                           <Button asChild variant="ghost" size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-brand-green hover:bg-brand-green/10">
-                            <Link href={`/proforma-invoices/${row.id}/pdf`}><Printer className="h-3.5 w-3.5" /></Link>
+                            <Link href={withAutoPrint(`/proforma-invoices/${row.id}/pdf`)}><Printer className="h-3.5 w-3.5" /></Link>
                           </Button>
                         </div>
                       </td>
