@@ -165,21 +165,57 @@ export function printReceiptHtml(opts: {
 function once(fn?: () => void) {
   let called = false;
   return () => {
-    if (called || !fn) return;
+    if (called) return;
     called = true;
-    fn();
+    fn?.();
   };
+}
+
+function triggerPrint(win: Window, onFail: () => void) {
+  const doc = win.document;
+  const printNow = once(() => {
+    try {
+      win.focus();
+      win.print();
+    } catch {
+      onFail();
+    }
+  });
+
+  const waitForImagesThenPrint = () => {
+    const images = Array.from(doc.images ?? []);
+    const pending = images.filter((img) => !img.complete);
+    if (pending.length === 0) {
+      window.setTimeout(printNow, 50);
+      return;
+    }
+    let left = pending.length;
+    const done = () => {
+      left -= 1;
+      if (left <= 0) window.setTimeout(printNow, 50);
+    };
+    pending.forEach((img) => {
+      img.addEventListener("load", done, { once: true });
+      img.addEventListener("error", done, { once: true });
+    });
+    window.setTimeout(printNow, 4000);
+  };
+
+  if (doc.readyState === "complete") waitForImagesThenPrint();
+  else win.addEventListener("load", waitForImagesThenPrint, { once: true });
 }
 
 function printViaIframe(documentHtml: string, onAfterPrint?: () => void) {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
+  iframe.style.left = "-10000px";
+  iframe.style.top = "0";
+  iframe.style.width = "210mm";
+  iframe.style.height = "297mm";
   iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
   document.body.appendChild(iframe);
 
   const win = iframe.contentWindow;
@@ -200,15 +236,8 @@ function printViaIframe(documentHtml: string, onAfterPrint?: () => void) {
   doc.close();
 
   win.addEventListener("afterprint", finish);
-  window.setTimeout(() => {
-    try {
-      win.focus();
-      win.print();
-    } catch {
-      finish();
-    }
-  }, 400);
-  window.setTimeout(finish, 8000);
+  triggerPrint(win, finish);
+  window.setTimeout(finish, 180000);
 }
 
 function fallbackPopupPrint(documentHtml: string, onAfterPrint?: () => void) {
@@ -220,15 +249,8 @@ function fallbackPopupPrint(documentHtml: string, onAfterPrint?: () => void) {
   }
   win.document.write(documentHtml);
   win.document.close();
-  win.focus();
   win.addEventListener("afterprint", finish);
-  window.setTimeout(() => {
-    try {
-      win.print();
-    } catch {
-      finish();
-    }
-  }, 400);
+  triggerPrint(win, finish);
   window.setTimeout(() => {
     finish();
     try {
@@ -236,7 +258,7 @@ function fallbackPopupPrint(documentHtml: string, onAfterPrint?: () => void) {
     } catch {
       /* ignore */
     }
-  }, 8000);
+  }, 180000);
 }
 
 export function withAutoPrint(path: string) {
@@ -265,14 +287,17 @@ export function clearAutoPrintQuery() {
 
 export function useAutoPrint(ready: boolean, printFn: () => void) {
   const did = useRef(false);
+  const printFnRef = useRef(printFn);
+  printFnRef.current = printFn;
   useEffect(() => {
     if (!ready || did.current) return;
     if (!shouldAutoPrintReceipt()) return;
-    did.current = true;
     const timer = window.setTimeout(() => {
-      printFn();
+      if (did.current) return;
+      did.current = true;
+      printFnRef.current();
       clearAutoPrintQuery();
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [ready, printFn]);
+  }, [ready]);
 }

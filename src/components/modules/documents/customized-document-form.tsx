@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, Loader2, Home } from "lucide-react";
+import { Trash2, Loader2, Home, Printer } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/erp/page-header";
 import { createEntity, getEntity, updateEntity } from "@/services/entity.service";
+import { withAutoPrint } from "@/lib/print-receipt";
 import type { DocumentFormConfig } from "./document-form";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -230,11 +231,11 @@ export function CustomizedDocumentForm({
     updatedAt: new Date(),
   });
 
-  const handleSave = async () => {
-    if (!form.customerName.trim()) { setError("Customer name is required."); return; }
+  const persist = async (): Promise<string | null> => {
+    if (!form.customerName.trim()) { setError("Customer name is required."); return null; }
     if (form.rooms.some((r) => !r.roomName.trim())) {
       setError("Each room/location must have a name.");
-      return;
+      return null;
     }
     setSaving(true);
     setError(null);
@@ -242,17 +243,29 @@ export function CustomizedDocumentForm({
       if (mode === "create") {
         const payload = buildPayload();
         payload.createdAt = new Date();
-        const newId = await createEntity(config.collection, payload);
-        router.push(`${config.basePath}/${newId}`);
-      } else if (id) {
-        await updateEntity(config.collection, id, buildPayload());
-        router.push(`${config.basePath}/${id}`);
+        return await createEntity(config.collection, payload);
       }
+      if (id) {
+        await updateEntity(config.collection, id, buildPayload());
+        return id;
+      }
+      return null;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
+      return null;
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSave = async () => {
+    const savedId = await persist();
+    if (savedId) router.push(`${config.basePath}/${savedId}`);
+  };
+
+  const handlePrint = async () => {
+    const savedId = await persist();
+    if (savedId) router.push(withAutoPrint(`${config.basePath}/${savedId}/pdf`));
   };
 
   const pageTitle = `New Customized ${config.docLabel === "PROFORMA INVOICE" ? "Proforma Invoice" : "Quotation"}`;
@@ -265,6 +278,11 @@ export function CustomizedDocumentForm({
         actions={
           <>
             <Button variant="outline" onClick={() => router.back()} disabled={saving}>Cancel</Button>
+            <Button variant="outline" onClick={handlePrint} disabled={saving || loading}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Printer className="mr-2 h-4 w-4" />
+              Print
+            </Button>
             <Button variant="gold" onClick={handleSave} disabled={saving || loading}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {saving ? "Saving…" : "Save"}
@@ -393,6 +411,11 @@ export function CustomizedDocumentForm({
             <Button variant="gold" onClick={handleSave} disabled={saving} className="min-w-[140px]">
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {saving ? "Saving…" : "Save"}
+            </Button>
+            <Button variant="outline" onClick={handlePrint} disabled={saving} className="min-w-[140px]">
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Printer className="mr-2 h-4 w-4" />
+              Print
             </Button>
             <Button variant="outline" onClick={() => router.back()} disabled={saving}>Cancel</Button>
           </div>

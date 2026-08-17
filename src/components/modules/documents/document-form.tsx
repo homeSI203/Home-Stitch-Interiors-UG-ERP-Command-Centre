@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Plus, Trash2, Loader2, Printer } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import {
   findEntitiesByField,
   deleteEntityPermanently,
 } from "@/services/entity.service";
+import { withAutoPrint } from "@/lib/print-receipt";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -387,17 +388,16 @@ export function DocumentForm({
     updatedAt: new Date(),
   });
 
-  const handleSave = async () => {
-    if (!form.customerName.trim()) { setError("Customer name is required."); return; }
+  const persist = async (): Promise<string | null> => {
+    if (!form.customerName.trim()) { setError("Customer name is required."); return null; }
     if (form.items.some((r) => !r.description.trim())) {
       setError("Each line item needs a description.");
-      return;
+      return null;
     }
     setSaving(true);
     setError(null);
     try {
       if (mode === "create") {
-        // Check for existing docs with the same document number
         const existing = await findEntitiesByField<Record<string, unknown>>(
           config.collection,
           config.docNumberField,
@@ -405,7 +405,6 @@ export function DocumentForm({
         );
 
         if (existing.length > 0) {
-          // Merge items into the first (oldest) existing doc, delete the rest
           const primary = existing[0];
           const existingItems: LineItem[] = Array.isArray(primary.items)
             ? (primary.items as LineItem[])
@@ -420,23 +419,34 @@ export function DocumentForm({
             notes: form.notes || primary.notes,
             updatedAt: new Date(),
           });
-          router.push(`${config.basePath}/${primary.id}`);
-          return;
+          return String(primary.id);
         }
 
         const payload = buildPayload();
         payload.createdAt = new Date();
-        const newId = await createEntity(config.collection, payload);
-        router.push(`${config.basePath}/${newId}`);
-      } else if (id) {
-        await updateEntity(config.collection, id, buildPayload());
-        router.push(`${config.basePath}/${id}`);
+        return await createEntity(config.collection, payload);
       }
+      if (id) {
+        await updateEntity(config.collection, id, buildPayload());
+        return id;
+      }
+      return null;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
+      return null;
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSave = async () => {
+    const savedId = await persist();
+    if (savedId) router.push(`${config.basePath}/${savedId}`);
+  };
+
+  const handlePrint = async () => {
+    const savedId = await persist();
+    if (savedId) router.push(withAutoPrint(`${config.basePath}/${savedId}/pdf`));
   };
 
   // Merge all duplicate records in Firestore for the current doc number
@@ -507,6 +517,11 @@ export function DocumentForm({
           <>
             <Button variant="outline" onClick={() => router.back()} disabled={saving}>
               Cancel
+            </Button>
+            <Button variant="outline" onClick={handlePrint} disabled={saving || loading}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Printer className="mr-2 h-4 w-4" />
+              Print
             </Button>
             <Button variant="gold" onClick={handleSave} disabled={saving || loading}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -771,6 +786,11 @@ export function DocumentForm({
             <Button variant="gold" onClick={handleSave} disabled={saving} className="min-w-[140px]">
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {saving ? "Saving…" : "Save"}
+            </Button>
+            <Button variant="outline" onClick={handlePrint} disabled={saving} className="min-w-[140px]">
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Printer className="mr-2 h-4 w-4" />
+              Print
             </Button>
             <Button variant="outline" onClick={() => router.back()} disabled={saving}>
               Cancel

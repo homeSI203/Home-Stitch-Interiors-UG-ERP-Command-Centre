@@ -163,7 +163,7 @@ function PrintSheet({
           objectFit: "contain",
           opacity: 0.18,
           pointerEvents: "none",
-          zIndex: -1,
+          zIndex: 0,
         }}
       />
 
@@ -541,20 +541,28 @@ export function DocumentSheetPage({ config }: { config: DocumentSheetConfig }) {
       setData(doc);
       setCompany(co);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, [config.collection, id]);
 
   const docNumber = data ? String(data[config.docNumberField] ?? id) : id;
 
   const handlePrint = useCallback(() => {
-    const el = document.getElementById("doc-print");
-    if (!el) return;
-    printHtmlDocument({
-      html: el.innerHTML,
-      title: config.docLabel,
-      styles: A4_SHEET_PRINT_STYLES,
-    });
-  }, [config.docLabel]);
+    const run = (attempt = 0) => {
+      const el = document.getElementById("doc-print");
+      if (!el) {
+        if (attempt < 12) window.setTimeout(() => run(attempt + 1), 80);
+        return;
+      }
+      printHtmlDocument({
+        html: el.outerHTML,
+        title: `${config.docLabel} ${docNumber}`,
+        styles: `${A4_SHEET_PRINT_STYLES}
+          #doc-print { position: relative; min-height: 995px; }
+        `,
+      });
+    };
+    run();
+  }, [config.docLabel, docNumber]);
 
   useAutoPrint(!loading && !!data, handlePrint);
 
@@ -572,7 +580,7 @@ export function DocumentSheetPage({ config }: { config: DocumentSheetConfig }) {
               <ArrowLeft className="mr-2 h-4 w-4" /> Back
             </Link>
           </Button>
-          <Button variant="gold" onClick={handlePrint} disabled={loading}>
+          <Button variant="gold" onClick={handlePrint} disabled={loading || !data}>
             <Printer className="mr-2 h-4 w-4" /> Print / Save PDF
           </Button>
         </div>

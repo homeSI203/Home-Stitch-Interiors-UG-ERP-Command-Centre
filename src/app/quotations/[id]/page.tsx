@@ -15,10 +15,10 @@ export default function Page() {
       config={ENTITY_MODULES.quotation}
       id={id}
       extraActions={
-        <Button asChild variant="outline">
+        <Button asChild variant="gold">
           <Link href={withAutoPrint(`/quotations/${id}/pdf`)}>
             <Printer className="mr-2 h-4 w-4" />
-            Print / PDF
+            Print
           </Link>
         </Button>
       }
