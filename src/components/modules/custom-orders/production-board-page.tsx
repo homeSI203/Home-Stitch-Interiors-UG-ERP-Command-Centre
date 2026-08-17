@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { Loader2, ChevronRight, ExternalLink, RefreshCw } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { PageHeader } from "@/components/erp/page-header";
@@ -132,9 +131,12 @@ function OrderCard({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export function ProductionBoardPage() {
-  const searchParams = useSearchParams();
-  const highlightOrderId = searchParams.get("order");
+export function ProductionBoardPage({
+  highlightOrderId = null,
+}: {
+  highlightOrderId?: string | null;
+}) {
+  const [highlightId, setHighlightId] = useState<string | null>(highlightOrderId);
   const [orders,   setOrders]   = useState<Order[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -151,6 +153,15 @@ export function ProductionBoardPage() {
   }, []);
 
   useEffect(() => { reload(); }, [reload]);
+
+  useEffect(() => {
+    if (highlightOrderId) {
+      setHighlightId(highlightOrderId);
+      return;
+    }
+    const fromUrl = new URLSearchParams(window.location.search).get("order");
+    if (fromUrl) setHighlightId(fromUrl);
+  }, [highlightOrderId]);
 
   const moveOrder = useCallback(async (orderId: string, newStage: StageId) => {
     const order = orders.find((o) => String(o.id) === orderId);
@@ -309,7 +320,7 @@ export function ProductionBoardPage() {
                         order={order}
                         stageIdx={stageIdx}
                         isUpdating={updating === String(order.id)}
-                        highlighted={highlightOrderId === String(order.id)}
+                        highlighted={highlightId === String(order.id)}
                         onAdvance={() => advanceOrder(order)}
                         onDragStart={(e) => onDragStart(e, String(order.id))}
                         onDragEnd={onDragEnd}

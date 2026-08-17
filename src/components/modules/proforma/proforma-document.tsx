@@ -121,6 +121,8 @@ function ProformaSheet({
             {/* Logo / monogram */}
             <td style={{ width: "90px", verticalAlign: "middle" }}>
               {company?.logoUrl ? (
+                // Print HTML needs a plain img; next/image is not copied into the print document.
+                // eslint-disable-next-line @next/next/no-img-element
                 <img src={company.logoUrl} alt="Logo" style={{ width: 80, height: 80, objectFit: "contain" }} />
               ) : (
                 <div style={{

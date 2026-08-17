@@ -7,7 +7,6 @@ import { Printer, ArrowLeft } from "lucide-react";
 import { A4_SHEET_PRINT_STYLES, printHtmlDocument, useAutoPrint } from "@/lib/print-receipt";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/erp/page-header";
 import { getEntity } from "@/services/entity.service";
 import { getCompanyProfile } from "@/services/company.service";
 import type { CompanyProfile } from "@/types/domain";

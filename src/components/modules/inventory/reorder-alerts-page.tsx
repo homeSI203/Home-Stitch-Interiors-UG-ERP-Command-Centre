@@ -5,7 +5,7 @@ import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PageHeader, formatCellValue } from "@/components/erp/page-header";
+import { PageHeader } from "@/components/erp/page-header";
 import { listEntities } from "@/services/entity.service";
 
 export function ReorderAlertsPage() {

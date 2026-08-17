@@ -87,11 +87,9 @@ function ReceiptSheet({
   const GOLD = "#C9A24A";
   const WHITE = "#FFFFFF";
   const BROWN = "#4A1E0A";
-  const LGREY = "#f7f7f5";
   const BORDER = "#1F3D2B";
 
   const cell: React.CSSProperties = { border: `1px solid ${BORDER}`, padding: "5px 10px", verticalAlign: "middle", color: BROWN };
-  const cellAlt: React.CSSProperties = { ...cell, background: LGREY };
   const hCell: React.CSSProperties = {
     border: `1px solid ${BORDER}`,
     padding: "7px 10px",

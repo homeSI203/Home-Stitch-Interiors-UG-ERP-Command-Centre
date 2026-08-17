@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NAV_GROUPS, COMPANY, type NavItem } from "@/lib/navigation";
@@ -60,11 +61,14 @@ export function MobileSidebar() {
                 className="flex items-center gap-3 min-w-0"
                 onClick={() => setMobileOpen(false)}
               >
-                <img
+                <Image
                   src="/logos/logo-white.png"
                   alt={COMPANY.shortName}
+                  width={80}
+                  height={40}
                   className="h-10 w-auto shrink-0"
                   style={{ mixBlendMode: "screen" }}
+                  priority
                 />
                 <div className="min-w-0 flex flex-col gap-0.5">
                   <span className="font-display text-sm font-semibold text-brand-beige leading-tight truncate">

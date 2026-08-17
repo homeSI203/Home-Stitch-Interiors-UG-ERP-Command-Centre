@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NAV_GROUPS, COMPANY, type NavItem } from "@/lib/navigation";
@@ -153,11 +154,14 @@ export function Sidebar() {
         <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
           {!isCollapsed ? (
             <Link href="/dashboard" className="flex items-center gap-3 min-w-0">
-              <img
+              <Image
                 src="/logos/logo-white.png"
                 alt={COMPANY.shortName}
+                width={80}
+                height={40}
                 className="h-10 w-auto shrink-0"
                 style={{ mixBlendMode: "screen" }}
+                priority
               />
               <div className="min-w-0 flex flex-col gap-0.5">
                 <span className="font-display text-sm font-semibold text-brand-beige leading-tight truncate">
@@ -170,11 +174,14 @@ export function Sidebar() {
             </Link>
           ) : (
             <Link href="/dashboard" className="mx-auto" title={COMPANY.systemName}>
-              <img
+              <Image
                 src="/logos/logo-white.png"
                 alt={COMPANY.shortName}
+                width={72}
+                height={36}
                 className="h-9 w-auto"
                 style={{ mixBlendMode: "screen" }}
+                priority
               />
             </Link>
           )}

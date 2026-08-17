@@ -10,13 +10,12 @@ import {
   Minus,
   Plus,
   X,
-  ChevronDown,
   Loader2,
   CheckCircle2,
   Barcode,
   FileText,
 } from "lucide-react";
-import { cn, formatCurrency, formatTime12h } from "@/lib/utils";
+import { cn, formatTime12h } from "@/lib/utils";
 import { listEntities, createEntity, updateEntity } from "@/services/entity.service";
 import { useAuth } from "@/hooks/use-auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";

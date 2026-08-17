@@ -269,6 +269,24 @@ const CUSTOM_IMPORTS = {
 };
 
 function customContent(name, props = {}) {
+  if (name === "ProductionBoardPage") {
+    return `import { ProductionBoardPage } from "@/components/modules/custom-orders/production-board-page";
+
+function firstParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ order?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  return <ProductionBoardPage highlightOrderId={firstParam(params.order) ?? null} />;
+}
+`;
+  }
   const importPath = CUSTOM_IMPORTS[name];
   const propsStr = Object.entries(props)
     .map(([k, v]) => `${k}=${JSON.stringify(v)}`)

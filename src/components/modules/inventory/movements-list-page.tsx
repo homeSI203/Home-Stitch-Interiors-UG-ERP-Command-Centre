@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { listEntities, exportToCsv, downloadCsv } from "@/services/entity.service";
-import { formatCurrency, formatTime12h, cn } from "@/lib/utils";
+import { formatTime12h, cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

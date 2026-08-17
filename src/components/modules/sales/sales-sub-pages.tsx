@@ -1,13 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader, formatCellValue } from "@/components/erp/page-header";
-import { getEntity } from "@/services/entity.service";
 import { DocumentPdfPage } from "@/components/erp/document-pdf-page";
 
 export function SaleReceiptPage() {
