@@ -114,11 +114,13 @@ export function printHtmlDocument(opts: {
   html: string;
   title: string;
   styles: string;
+  onAfterPrint?: () => void;
 }) {
   const origin = window.location.origin;
   const html = opts.html.replace(/src="(\/[^"]+)"/g, `src="${origin}$1"`);
   const title = opts.title.replace(/[<>]/g, "");
-  printViaIframe(`<!DOCTYPE html>
+  printViaIframe(
+    `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
@@ -126,19 +128,23 @@ export function printHtmlDocument(opts: {
     <style>${opts.styles}</style>
   </head>
   <body>${html}</body>
-</html>`);
+</html>`,
+    opts.onAfterPrint
+  );
 }
 
 export function printReceiptHtml(opts: {
   html: string;
   title: string;
   format: "thermal" | "a4";
+  onAfterPrint?: () => void;
 }) {
   const { title, format } = opts;
   const isA4 = format === "a4";
   printHtmlDocument({
     html: opts.html,
     title,
+    onAfterPrint: opts.onAfterPrint,
     styles: `
       ${RECEIPT_PRINT_CSS}
       body {
@@ -156,7 +162,16 @@ export function printReceiptHtml(opts: {
   });
 }
 
-function printViaIframe(documentHtml: string) {
+function once(fn?: () => void) {
+  let called = false;
+  return () => {
+    if (called || !fn) return;
+    called = true;
+    fn();
+  };
+}
+
+function printViaIframe(documentHtml: string, onAfterPrint?: () => void) {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.position = "fixed";
@@ -169,9 +184,14 @@ function printViaIframe(documentHtml: string) {
 
   const win = iframe.contentWindow;
   const doc = iframe.contentDocument;
+  const finish = once(() => {
+    onAfterPrint?.();
+    window.setTimeout(() => iframe.remove(), 500);
+  });
+
   if (!win || !doc) {
     iframe.remove();
-    fallbackPopupPrint(documentHtml);
+    fallbackPopupPrint(documentHtml, onAfterPrint);
     return;
   }
 
@@ -179,26 +199,44 @@ function printViaIframe(documentHtml: string) {
   doc.write(documentHtml);
   doc.close();
 
+  win.addEventListener("afterprint", finish);
   window.setTimeout(() => {
     try {
       win.focus();
       win.print();
-    } finally {
-      window.setTimeout(() => iframe.remove(), 1000);
+    } catch {
+      finish();
     }
   }, 400);
+  window.setTimeout(finish, 8000);
 }
 
-function fallbackPopupPrint(documentHtml: string) {
+function fallbackPopupPrint(documentHtml: string, onAfterPrint?: () => void) {
+  const finish = once(onAfterPrint);
   const win = window.open("", "_blank", "width=900,height=700");
-  if (!win) return;
+  if (!win) {
+    finish();
+    return;
+  }
   win.document.write(documentHtml);
   win.document.close();
   win.focus();
+  win.addEventListener("afterprint", finish);
   window.setTimeout(() => {
-    win.print();
-    win.close();
+    try {
+      win.print();
+    } catch {
+      finish();
+    }
   }, 400);
+  window.setTimeout(() => {
+    finish();
+    try {
+      win.close();
+    } catch {
+      /* ignore */
+    }
+  }, 8000);
 }
 
 export function withAutoPrint(path: string) {

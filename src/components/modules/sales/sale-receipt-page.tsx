@@ -301,17 +301,28 @@ export function SaleReceiptPage() {
     });
   }, [params?.id]);
 
-  const handlePrint = useCallback(() => {
-    const area = printRef.current;
-    if (!area || !sale) return;
-    printReceiptHtml({
-      html: area.innerHTML,
-      title: sale.saleNumber || "Receipt",
-      format,
-    });
-  }, [sale, format]);
+  const handlePrint = useCallback(
+    (returnToPos = false) => {
+      const area = printRef.current;
+      if (!area || !sale) return;
+      printReceiptHtml({
+        html: area.innerHTML,
+        title: sale.saleNumber || "Receipt",
+        format,
+        onAfterPrint: returnToPos
+          ? () => {
+              const dest = new URLSearchParams(window.location.search).get("returnTo");
+              if (dest?.startsWith("/") && !dest.startsWith("//")) {
+                router.replace(dest);
+              }
+            }
+          : undefined,
+      });
+    },
+    [sale, format, router]
+  );
 
-  useAutoPrint(!loading && !!sale, handlePrint);
+  useAutoPrint(!loading && !!sale, () => handlePrint(true));
 
   return (
     <DashboardLayout title="Receipt" requiredPermission="view_sales">
@@ -356,7 +367,7 @@ export function SaleReceiptPage() {
         </div>
         <button
           type="button"
-          onClick={handlePrint}
+          onClick={() => handlePrint()}
           className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
         >
           <Printer className="h-4 w-4" />

@@ -403,6 +403,10 @@ export function PosPage() {
     });
   }, []);
 
+  useEffect(() => {
+    barcodeRef.current?.focus();
+  }, []);
+
   const addToCart = useCallback((product: Product) => {
     setCart((prev) => {
       const existing = prev.findIndex((i) => i.productId === product.id);
@@ -512,6 +516,21 @@ export function PosPage() {
   const taxTotal = cart.reduce((s, i) => s + (i.price * i.qty * i.taxRate) / 100, 0);
   const grandTotal = subtotal + taxTotal;
 
+  const resetSaleSession = useCallback(() => {
+    setCart([]);
+    setSelectedRow(null);
+    setNumpadBuffer("");
+    setBarcodeInput("");
+    setCustomerName("Walk-in Customer");
+    setPaymentMethod("");
+    setDefaultTaxRate(0);
+    setShowPayWidget(false);
+    setMobileMoneyStep(false);
+    setShowPicker(false);
+    setShowCustomer(false);
+    setShowInstallments(false);
+  }, []);
+
   const clearCart = () => {
     setCart([]);
     setSelectedRow(null);
@@ -552,11 +571,12 @@ export function PosPage() {
         amount: grandTotal,
         paymentMethod: chosenMethod,
       });
-      router.push(`/sales/${id}/receipt?autoprint=1`);
+      resetSaleSession();
+      router.push(`/sales/${id}/receipt?autoprint=1&returnTo=${encodeURIComponent("/sales/pos")}`);
     } finally {
       setSaving(false);
     }
-  }, [cart, customerName, subtotal, taxTotal, grandTotal, paymentMethod, router]);
+  }, [cart, customerName, subtotal, taxTotal, grandTotal, paymentMethod, resetSaleSession, router]);
 
 
   return (
