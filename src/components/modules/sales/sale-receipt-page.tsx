@@ -12,7 +12,7 @@ import type { CompanyProfile } from "@/types/domain";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface SaleItem {
+export interface SaleItem {
   productId?: string;
   description: string;
   quantity: number;
@@ -21,7 +21,7 @@ interface SaleItem {
   total: number;
 }
 
-interface Sale {
+export interface Sale {
   id: string;
   saleNumber: string;
   customerName: string;
@@ -35,7 +35,7 @@ interface Sale {
   createdAt?: { toDate?: () => Date } | string | number;
 }
 
-const FALLBACK_COMPANY: Pick<CompanyProfile, "name" | "tagline" | "phone" | "phoneSecondary" | "email" | "address" | "logoUrl"> = {
+export const FALLBACK_COMPANY: Pick<CompanyProfile, "name" | "tagline" | "phone" | "phoneSecondary" | "email" | "address" | "logoUrl"> = {
   name: "HOME STITCH INTERIORS UG",
   tagline: "Where Comfort Is Tailored",
   phone: "+256 757 148631",
@@ -76,7 +76,7 @@ function getSaleDate(sale: Sale): Date {
 
 // ─── Thermal Receipt ─────────────────────────────────────────────────────────
 
-function ThermalReceipt({ sale, company }: { sale: Sale; company: CompanyProfile }) {
+export function ThermalReceipt({ sale, company }: { sale: Sale; company: CompanyProfile }) {
   const date = getSaleDate(sale);
   return (
     <div className="bg-white font-mono text-[11px] leading-snug w-[300px] mx-auto p-4 border border-dashed border-gray-300 shadow-sm">
