@@ -2,10 +2,11 @@
 
 import { useEffect, useRef } from "react";
 
+const RECEIPT_FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Roboto+Mono:wght@400;700&display=swap');`;
+
 const RECEIPT_PRINT_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Roboto+Mono:wght@400;700&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; }
-.font-mono { font-family: 'Roboto Mono', monospace; }
+.font-mono { font-family: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Consolas, monospace; }
 .font-bold { font-weight: 700; }
 .font-semibold { font-weight: 600; }
 .font-black { font-weight: 900; }
@@ -115,6 +116,7 @@ export function printHtmlDocument(opts: {
   title: string;
   styles: string;
   onAfterPrint?: () => void;
+  paper?: "a4" | "thermal";
 }) {
   const origin = window.location.origin;
   const html = opts.html.replace(/src="(\/[^"]+)"/g, `src="${origin}$1"`);
@@ -129,7 +131,8 @@ export function printHtmlDocument(opts: {
   </head>
   <body>${html}</body>
 </html>`,
-    opts.onAfterPrint
+    opts.onAfterPrint,
+    opts.paper ?? "a4"
   );
 }
 
@@ -145,14 +148,16 @@ export function printReceiptHtml(opts: {
     html: opts.html,
     title,
     onAfterPrint: opts.onAfterPrint,
+    paper: isA4 ? "a4" : "thermal",
     styles: `
+      ${isA4 ? RECEIPT_FONT_IMPORT : ""}
       ${RECEIPT_PRINT_CSS}
       body {
-        font-family: ${isA4 ? "'Inter', sans-serif" : "'Roboto Mono', monospace"};
+        font-family: ${isA4 ? "'Inter', sans-serif" : "ui-monospace, Consolas, monospace"};
         font-size: ${isA4 ? "12px" : "11px"};
         background: white;
         color: #111;
-        ${isA4 ? "" : "display:flex;justify-content:center;padding:16px;"}
+        ${isA4 ? "" : "display:flex;justify-content:center;padding:8px;"}
       }
       @page {
         size: ${isA4 ? "A4 portrait" : "80mm auto"};
@@ -171,7 +176,7 @@ function once(fn?: () => void) {
   };
 }
 
-function triggerPrint(win: Window, onFail: () => void) {
+function triggerPrint(win: Window, onFail: () => void, paper: "a4" | "thermal") {
   const doc = win.document;
   const printNow = once(() => {
     try {
@@ -182,37 +187,43 @@ function triggerPrint(win: Window, onFail: () => void) {
     }
   });
 
+  const maxImageWaitMs = paper === "thermal" ? 500 : 4000;
+
   const waitForImagesThenPrint = () => {
     const images = Array.from(doc.images ?? []);
     const pending = images.filter((img) => !img.complete);
     if (pending.length === 0) {
-      window.setTimeout(printNow, 50);
+      printNow();
       return;
     }
     let left = pending.length;
     const done = () => {
       left -= 1;
-      if (left <= 0) window.setTimeout(printNow, 50);
+      if (left <= 0) printNow();
     };
     pending.forEach((img) => {
       img.addEventListener("load", done, { once: true });
       img.addEventListener("error", done, { once: true });
     });
-    window.setTimeout(printNow, 4000);
+    window.setTimeout(printNow, maxImageWaitMs);
   };
 
-  if (doc.readyState === "complete") waitForImagesThenPrint();
+  if (paper === "thermal" || doc.readyState === "complete") waitForImagesThenPrint();
   else win.addEventListener("load", waitForImagesThenPrint, { once: true });
 }
 
-function printViaIframe(documentHtml: string, onAfterPrint?: () => void) {
+function printViaIframe(
+  documentHtml: string,
+  onAfterPrint?: () => void,
+  paper: "a4" | "thermal" = "a4"
+) {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.position = "fixed";
   iframe.style.left = "-10000px";
   iframe.style.top = "0";
-  iframe.style.width = "210mm";
-  iframe.style.height = "297mm";
+  iframe.style.width = paper === "thermal" ? "80mm" : "210mm";
+  iframe.style.height = paper === "thermal" ? "200mm" : "297mm";
   iframe.style.border = "0";
   iframe.style.opacity = "0";
   iframe.style.pointerEvents = "none";
@@ -227,7 +238,7 @@ function printViaIframe(documentHtml: string, onAfterPrint?: () => void) {
 
   if (!win || !doc) {
     iframe.remove();
-    fallbackPopupPrint(documentHtml, onAfterPrint);
+    fallbackPopupPrint(documentHtml, onAfterPrint, paper);
     return;
   }
 
@@ -236,11 +247,15 @@ function printViaIframe(documentHtml: string, onAfterPrint?: () => void) {
   doc.close();
 
   win.addEventListener("afterprint", finish);
-  triggerPrint(win, finish);
+  triggerPrint(win, finish, paper);
   window.setTimeout(finish, 180000);
 }
 
-function fallbackPopupPrint(documentHtml: string, onAfterPrint?: () => void) {
+function fallbackPopupPrint(
+  documentHtml: string,
+  onAfterPrint?: () => void,
+  paper: "a4" | "thermal" = "a4"
+) {
   const finish = once(onAfterPrint);
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) {
@@ -250,7 +265,7 @@ function fallbackPopupPrint(documentHtml: string, onAfterPrint?: () => void) {
   win.document.write(documentHtml);
   win.document.close();
   win.addEventListener("afterprint", finish);
-  triggerPrint(win, finish);
+  triggerPrint(win, finish, paper);
   window.setTimeout(() => {
     finish();
     try {

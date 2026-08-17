@@ -461,9 +461,14 @@ export function PosPage() {
   useEffect(() => {
     if (!printSale) return;
     if (printedSaleId.current === printSale.id) return;
-    const frame = window.requestAnimationFrame(() => {
+    let attempts = 0;
+    let frame = 0;
+    const tryPrint = () => {
       const area = printRef.current;
-      if (!area || !area.innerHTML.trim()) return;
+      if (!area || !area.innerHTML.trim()) {
+        if (attempts++ < 24) frame = window.requestAnimationFrame(tryPrint);
+        return;
+      }
       printedSaleId.current = printSale.id;
       printReceiptHtml({
         html: area.innerHTML,
@@ -471,7 +476,8 @@ export function PosPage() {
         format: "thermal",
         onAfterPrint: () => setPrintSale(null),
       });
-    });
+    };
+    frame = window.requestAnimationFrame(tryPrint);
     return () => window.cancelAnimationFrame(frame);
   }, [printSale]);
 
@@ -591,26 +597,41 @@ export function PosPage() {
     if (!chosenMethod) return;
     savingRef.current = true;
     setSaving(true);
+
+    const saleNumber = `SALE-${Date.now()}`;
+    const items = cart.map((i) => ({
+      productId: i.productId,
+      description: i.name,
+      quantity: i.qty,
+      unitPrice: i.price,
+      taxRate: i.taxRate,
+      total: i.price * i.qty * (1 + i.taxRate / 100),
+    }));
+    const salePayload = {
+      saleNumber,
+      customerName,
+      items,
+      subtotal,
+      discount: 0,
+      tax: taxTotal,
+      total: grandTotal,
+      paymentMethod: chosenMethod,
+      paymentStatus: "paid" as const,
+    };
+    const saleForPrint: ReceiptSale = {
+      id: saleNumber,
+      ...salePayload,
+      createdAt: Date.now(),
+    };
+
+    resetSaleSession();
+    setPrintSale(saleForPrint);
+    barcodeRef.current?.focus();
+    savingRef.current = false;
+    setSaving(false);
+
     try {
-      const saleNumber = `SALE-${Date.now()}`;
-      const id = await createEntity("sales", {
-        saleNumber,
-        customerName,
-        items: cart.map((i) => ({
-          productId: i.productId,
-          description: i.name,
-          quantity: i.qty,
-          unitPrice: i.price,
-          taxRate: i.taxRate,
-          total: i.price * i.qty * (1 + i.taxRate / 100),
-        })),
-        subtotal,
-        discount: 0,
-        tax: taxTotal,
-        total: grandTotal,
-        paymentMethod: chosenMethod,
-        paymentStatus: "paid",
-      });
+      const id = await createEntity("sales", salePayload);
       await createEntity("receipts", {
         receiptNumber: `RCT-${Date.now()}`,
         saleId: id,
@@ -619,32 +640,8 @@ export function PosPage() {
         amount: grandTotal,
         paymentMethod: chosenMethod,
       });
-      const saleForPrint: ReceiptSale = {
-        id,
-        saleNumber,
-        customerName,
-        items: cart.map((i) => ({
-          productId: i.productId,
-          description: i.name,
-          quantity: i.qty,
-          unitPrice: i.price,
-          taxRate: i.taxRate,
-          total: i.price * i.qty * (1 + i.taxRate / 100),
-        })),
-        subtotal,
-        discount: 0,
-        tax: taxTotal,
-        total: grandTotal,
-        paymentMethod: chosenMethod,
-        paymentStatus: "paid",
-        createdAt: Date.now(),
-      };
-      resetSaleSession();
-      setPrintSale(saleForPrint);
-      barcodeRef.current?.focus();
-    } finally {
-      savingRef.current = false;
-      setSaving(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Receipt printed, but the sale failed to save. Retry from Sales.");
     }
   }, [cart, customerName, subtotal, taxTotal, grandTotal, paymentMethod, resetSaleSession]);
 
@@ -1003,48 +1000,23 @@ export function PosPage() {
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  {PAY_METHODS.map((m) => {
-                    const selected = paymentMethod === m.value;
-                    return (
+                  {PAY_METHODS.map((m) => (
                     <button
                       key={m.value}
                       type="button"
-                      onClick={() => {
-                        if (selected) {
-                          confirmSelectedPayment(m.value);
-                          return;
-                        }
-                        setPaymentMethod(m.value);
-                      }}
-                      onDoubleClick={() => confirmSelectedPayment(m.value)}
-                      className={cn(
-                        "flex flex-col items-center justify-center gap-2 rounded-xl border-2 py-5 text-sm font-semibold transition-all active:scale-95",
-                        selected
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-300"
-                          : "border-gray-200 text-gray-700 hover:border-emerald-400 hover:bg-emerald-50"
-                      )}
+                      onClick={() => confirmSelectedPayment(m.value)}
+                      disabled={saving}
+                      className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-gray-200 py-5 text-sm font-semibold text-gray-700 transition-all active:scale-95 hover:border-emerald-400 hover:bg-emerald-50 disabled:opacity-50"
                     >
                       <span className="text-3xl">{m.emoji}</span>
                       {m.label}
                     </button>
-                    );
-                  })}
+                  ))}
                 </div>
                 <button
                   type="button"
-                  onClick={() => confirmSelectedPayment()}
-                  disabled={saving || !paymentMethod}
-                  className="mt-4 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-200 disabled:text-gray-400 text-white text-sm font-bold py-3 tracking-wide uppercase"
-                >
-                  {saving ? "Processing…" : "Complete payment  ·  Enter"}
-                </button>
-                <p className="mt-2 text-center text-xs text-gray-400">
-                  Select a method, then press Enter to pay and print the receipt
-                </p>
-                <button
-                  type="button"
                   onClick={() => setShowPayWidget(false)}
-                  className="mt-1 w-full text-sm text-gray-400 hover:text-gray-600 py-2"
+                  className="mt-4 w-full text-sm text-gray-400 hover:text-gray-600 py-2"
                 >
                   Cancel
                 </button>
@@ -1064,20 +1036,9 @@ export function PosPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <button
                     type="button"
-                    onClick={() => {
-                      if (paymentMethod === "mobile_money_mtn") {
-                        confirmSelectedPayment("mobile_money_mtn");
-                        return;
-                      }
-                      setPaymentMethod("mobile_money_mtn");
-                    }}
-                    onDoubleClick={() => confirmSelectedPayment("mobile_money_mtn")}
-                    className={cn(
-                      "flex flex-col items-center justify-center gap-3 rounded-xl border-2 py-6 text-sm font-bold transition-all active:scale-95",
-                      paymentMethod === "mobile_money_mtn"
-                        ? "border-yellow-400 bg-yellow-50 text-gray-800 ring-2 ring-yellow-300"
-                        : "border-gray-200 text-gray-700 hover:border-yellow-400 hover:bg-yellow-50"
-                    )}
+                    onClick={() => confirmSelectedPayment("mobile_money_mtn")}
+                    disabled={saving}
+                    className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-gray-200 py-6 text-sm font-bold text-gray-700 transition-all active:scale-95 hover:border-yellow-400 hover:bg-yellow-50 disabled:opacity-50"
                   >
                     <div className="h-12 w-12 rounded-full bg-yellow-400 flex items-center justify-center text-white font-black text-lg shadow">
                       MTN
@@ -1086,20 +1047,9 @@ export function PosPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (paymentMethod === "mobile_money_airtel") {
-                        confirmSelectedPayment("mobile_money_airtel");
-                        return;
-                      }
-                      setPaymentMethod("mobile_money_airtel");
-                    }}
-                    onDoubleClick={() => confirmSelectedPayment("mobile_money_airtel")}
-                    className={cn(
-                      "flex flex-col items-center justify-center gap-3 rounded-xl border-2 py-6 text-sm font-bold transition-all active:scale-95",
-                      paymentMethod === "mobile_money_airtel"
-                        ? "border-red-400 bg-red-50 text-gray-800 ring-2 ring-red-300"
-                        : "border-gray-200 text-gray-700 hover:border-red-400 hover:bg-red-50"
-                    )}
+                    onClick={() => confirmSelectedPayment("mobile_money_airtel")}
+                    disabled={saving}
+                    className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-gray-200 py-6 text-sm font-bold text-gray-700 transition-all active:scale-95 hover:border-red-400 hover:bg-red-50 disabled:opacity-50"
                   >
                     <div className="h-12 w-12 rounded-full bg-red-600 flex items-center justify-center text-white font-black text-lg shadow">
                       AIR
@@ -1109,19 +1059,8 @@ export function PosPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => confirmSelectedPayment()}
-                  disabled={saving || (paymentMethod !== "mobile_money_mtn" && paymentMethod !== "mobile_money_airtel")}
-                  className="mt-4 w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-200 disabled:text-gray-400 text-white text-sm font-bold py-3 tracking-wide uppercase"
-                >
-                  {saving ? "Processing…" : "Complete payment  ·  Enter"}
-                </button>
-                <p className="mt-2 text-center text-xs text-gray-400">
-                  Select MTN or Airtel, then press Enter to pay and print
-                </p>
-                <button
-                  type="button"
                   onClick={() => { setMobileMoneyStep(false); setPaymentMethod("mobile_money"); }}
-                  className="mt-1 w-full text-sm text-gray-400 hover:text-gray-600 py-2"
+                  className="mt-4 w-full text-sm text-gray-400 hover:text-gray-600 py-2"
                 >
                   ← Back
                 </button>
