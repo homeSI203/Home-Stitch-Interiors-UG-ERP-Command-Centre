@@ -5,7 +5,6 @@ import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EntityDetailPage } from "@/components/erp/entity-detail-page";
 import { ENTITY_MODULES } from "@/lib/erp/modules";
-import { withAutoPrint } from "@/lib/print-receipt";
 
 export default function Page() {
   const params = useParams();
@@ -16,9 +15,9 @@ export default function Page() {
       id={id}
       extraActions={
         <Button asChild variant="outline">
-          <Link href={withAutoPrint(`/invoices/${id}/pdf`)}>
+          <Link href={`/invoices/${id}/pdf`}>
             <Printer className="mr-2 h-4 w-4" />
-            Print / PDF
+            Preview
           </Link>
         </Button>
       }

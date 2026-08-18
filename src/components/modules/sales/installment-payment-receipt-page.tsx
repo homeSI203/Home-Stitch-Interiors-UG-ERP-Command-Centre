@@ -50,17 +50,19 @@ function companyLogo(company: CompanyProfile) {
   return company.logoUrl || "/logos/logo-color.png";
 }
 
-interface ReceiptModel {
+export interface ReceiptModel {
   plan: InstallmentPlan;
   payment: InstallmentPayment;
+  payments: InstallmentPayment[];
   paymentNo: number;
   paymentCount: number;
 }
 
-function ThermalInstallmentReceipt({ data, company }: { data: ReceiptModel; company: CompanyProfile }) {
-  const { plan, payment, paymentNo, paymentCount } = data;
+export function ThermalInstallmentReceipt({ data, company }: { data: ReceiptModel; company: CompanyProfile }) {
+  const { plan, payment, payments, paymentNo, paymentCount } = data;
   const date = payment.paidAt;
   const fullyPaid = plan.balance <= 0;
+  const history = [...payments].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   return (
     <div className="bg-white font-mono text-[11px] leading-snug w-[300px] mx-auto p-4 border border-dashed border-gray-300 shadow-sm">
       <div className="text-center mb-3">
@@ -83,13 +85,31 @@ function ThermalInstallmentReceipt({ data, company }: { data: ReceiptModel; comp
       <div className="mb-2 border-t border-dashed border-gray-400 pt-2">
         <p>Customer: <span className="font-semibold">{plan.customerName || "Walk-in"}</span></p>
         {plan.customerPhone && <p>Phone: <span className="font-semibold">{plan.customerPhone}</span></p>}
-        <p>Payment: <span className="font-semibold">{paymentLabel(payment.paymentMethod)}</span></p>
+        <p>This payment: <span className="font-semibold">{paymentLabel(payment.paymentMethod)}</span></p>
         <p>Instalment: <span className="font-semibold">{paymentNo} of {paymentCount}</span></p>
       </div>
 
       <div className="border-t border-dashed border-gray-400 pt-2 mb-2">
         <p className="text-gray-500 mb-1">Items / Description</p>
         <p className="font-semibold">{plan.description}</p>
+      </div>
+
+      <div className="border-t border-dashed border-gray-400 pt-2 mb-2">
+        <div className="grid grid-cols-12 font-bold mb-1">
+          <span className="col-span-2">#</span>
+          <span className="col-span-6">Payment</span>
+          <span className="col-span-4 text-right">Amount</span>
+        </div>
+        {history.map((p, i) => (
+          <div key={p.id} className={cn("grid grid-cols-12 mb-1", p.id === payment.id ? "font-bold" : "")}>
+            <span className="col-span-2">{i + 1}</span>
+            <span className="col-span-6">
+              {p.paidAt.toLocaleDateString("en-UG", { day: "2-digit", month: "short" })}
+              {" "}{paymentLabel(p.paymentMethod)}
+            </span>
+            <span className="col-span-4 text-right">{formatCurrency(p.amount)}</span>
+          </div>
+        ))}
       </div>
 
       <div className="border-t border-dashed border-gray-400 pt-2 space-y-0.5">
@@ -102,7 +122,7 @@ function ThermalInstallmentReceipt({ data, company }: { data: ReceiptModel; comp
           <span>{formatCurrency(plan.totalAmount)}</span>
         </div>
         <div className="flex justify-between text-green-700">
-          <span>Amount paid</span>
+          <span>Total paid</span>
           <span>{formatCurrency(plan.amountPaid)}</span>
         </div>
         <div className="flex justify-between font-bold border-t border-dashed border-gray-400 pt-1 mt-1">
@@ -128,7 +148,7 @@ function ThermalInstallmentReceipt({ data, company }: { data: ReceiptModel; comp
 }
 
 function A4InstallmentReceipt({ data, company }: { data: ReceiptModel; company: CompanyProfile }) {
-  const { plan, payment, paymentNo, paymentCount } = data;
+  const { plan, payment, payments, paymentNo, paymentCount } = data;
   const date = payment.paidAt;
   const fullyPaid = plan.balance <= 0;
   return (
@@ -189,6 +209,27 @@ function A4InstallmentReceipt({ data, company }: { data: ReceiptModel; company: 
         {payment.notes && <p className="text-sm text-gray-500 mt-1">Notes: {payment.notes}</p>}
       </div>
 
+      <table className="w-full text-sm mb-6">
+        <thead>
+          <tr className="bg-gray-900 text-white">
+            <th className="text-left py-2 px-3 rounded-tl-md">#</th>
+            <th className="text-left py-2 px-3">Date</th>
+            <th className="text-left py-2 px-3">Method</th>
+            <th className="text-right py-2 px-3 rounded-tr-md">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[...payments].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).map((p, i) => (
+            <tr key={p.id} className={p.id === payment.id ? "bg-emerald-50 font-semibold" : i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+              <td className="py-2 px-3 text-gray-400">{i + 1}</td>
+              <td className="py-2 px-3">{formatDate(p.paidAt)} {formatTime12h(p.paidAt)}</td>
+              <td className="py-2 px-3">{paymentLabel(p.paymentMethod)}</td>
+              <td className="py-2 px-3 text-right">{formatCurrency(p.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
       <div className="flex justify-end mb-8">
         <div className="w-64 space-y-1.5 text-sm">
           <div className="flex justify-between font-bold text-base text-gray-900">
@@ -244,6 +285,7 @@ export function InstallmentPaymentReceiptPage() {
         setData({
           plan,
           payment,
+          payments: chronological,
           paymentNo,
           paymentCount: chronological.length,
         });

@@ -17,7 +17,6 @@ import {
   findEntitiesByField,
   deleteEntityPermanently,
 } from "@/services/entity.service";
-import { withAutoPrint } from "@/lib/print-receipt";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -446,7 +445,7 @@ export function DocumentForm({
 
   const handlePrint = async () => {
     const savedId = await persist();
-    if (savedId) router.push(withAutoPrint(`${config.basePath}/${savedId}/pdf`));
+    if (savedId) router.push(`${config.basePath}/${savedId}/pdf`);
   };
 
   // Merge all duplicate records in Firestore for the current doc number

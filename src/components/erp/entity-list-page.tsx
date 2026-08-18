@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader, formatCellValue, Pagination } from "@/components/erp/page-header";
 import type { EntityConfig } from "@/lib/erp/entity-config";
-import { withAutoPrint } from "@/lib/print-receipt";
 import {
   archiveEntity,
   downloadCsv,
@@ -265,12 +264,12 @@ export function EntityListPage({ config }: { config: EntityConfig }) {
                         {config.rowAction === "print" ? (
                           <Button asChild variant="ghost" size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-brand-green hover:bg-brand-green/10"
-                            title="Print">
-                            <Link href={withAutoPrint(
+                            title="Preview">
+                            <Link href={
                               config.printHref
                                 ? config.printHref(row)
                                 : `${config.basePath}/${row.id}/${config.printPath ?? "receipt"}`
-                            )}>
+                            }>
                               <Printer className="h-3.5 w-3.5" />
                             </Link>
                           </Button>

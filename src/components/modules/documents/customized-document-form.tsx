@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/erp/page-header";
 import { createEntity, getEntity, updateEntity } from "@/services/entity.service";
-import { withAutoPrint } from "@/lib/print-receipt";
 import type { DocumentFormConfig } from "./document-form";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -265,7 +264,7 @@ export function CustomizedDocumentForm({
 
   const handlePrint = async () => {
     const savedId = await persist();
-    if (savedId) router.push(withAutoPrint(`${config.basePath}/${savedId}/pdf`));
+    if (savedId) router.push(`${config.basePath}/${savedId}/pdf`);
   };
 
   const pageTitle = `New Customized ${config.docLabel === "PROFORMA INVOICE" ? "Proforma Invoice" : "Quotation"}`;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Printer } from "lucide-react";
-import { A4_SHEET_PRINT_STYLES, printHtmlDocument, shouldAutoPrintReceipt, useAutoPrint, withAutoPrint } from "@/lib/print-receipt";
+import { A4_SHEET_PRINT_STYLES, printHtmlDocument, useAutoPrint } from "@/lib/print-receipt";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { getEntity } from "@/services/entity.service";
@@ -339,7 +339,7 @@ export function ReceiptPdfPage() {
     ]).then(([doc, co]) => {
       if (doc?.saleId) {
         const receiptPath = `/sales/${String(doc.saleId)}/receipt`;
-        router.replace(shouldAutoPrintReceipt() ? withAutoPrint(receiptPath) : receiptPath);
+        router.replace(receiptPath);
         return;
       }
       setData(doc);

@@ -1,11 +1,7 @@
 "use client";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { EntityListPage } from "@/components/erp/entity-list-page";
+import { ENTITY_MODULES } from "@/lib/erp/modules";
 
 export default function Page() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace("/sales/pos");
-  }, [router]);
-  return null;
+  return <EntityListPage config={ENTITY_MODULES.sale} />;
 }

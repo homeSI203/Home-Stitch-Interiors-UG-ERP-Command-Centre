@@ -17,7 +17,6 @@ import {
   type InstallmentPayment,
 } from "@/services/installment.service";
 import { formatTime12h } from "@/lib/utils";
-import { withAutoPrint } from "@/lib/print-receipt";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -302,7 +301,7 @@ export default function InstallmentDetailPage() {
                         <td className="text-muted-foreground text-xs">{pmt.receivedBy ?? "—"}</td>
                         <td className="text-right">
                           <Link
-                            href={withAutoPrint(`/sales/installments/${id}/payments/${pmt.id}/receipt`)}
+                            href={`/sales/installments/${id}/payments/${pmt.id}/receipt`}
                             className="inline-flex items-center gap-1 text-xs font-semibold text-brand-gold hover:underline"
                             title="Print receipt"
                           >

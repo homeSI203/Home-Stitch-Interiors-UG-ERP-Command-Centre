@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Barcode,
@@ -9,6 +8,7 @@ import {
   Loader2,
   Minus,
   Plus,
+  Printer,
   ShoppingCart,
   Trash2,
   User,
@@ -18,15 +18,32 @@ import {
 import { cn, formatCurrency, formatTime12h } from "@/lib/utils";
 import { createEntity, listEntities } from "@/services/entity.service";
 import { getCompanyProfile } from "@/services/company.service";
-import { listInstallmentPlans, type InstallmentPlan } from "@/services/installment.service";
+import {
+  createInstallmentPlan,
+  listInstallmentPlans,
+  listPaymentsForPlan,
+  recordPayment,
+  type InstallmentPlan,
+  type InstallmentPayment,
+} from "@/services/installment.service";
 import { useAuth } from "@/hooks/use-auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { printReceiptHtml } from "@/lib/print-receipt";
+import { encodeInstallmentReceipt, encodeSaleReceipt, encodeTestReceipt } from "@/lib/pos-escpos";
+import {
+  connectPosPrinter,
+  explainPrinterError,
+  isPosPrinterSupported,
+  printPosRaw,
+  subscribePosPrinter,
+} from "@/lib/pos-printer";
+import { PosPrinterSettingsModal } from "@/components/modules/sales/pos-printer-settings";
 import {
   FALLBACK_COMPANY,
-  ThermalReceipt,
   type Sale as ReceiptSale,
 } from "@/components/modules/sales/sale-receipt-page";
+import {
+  type ReceiptModel as InstallmentReceiptModel,
+} from "@/components/modules/sales/installment-payment-receipt-page";
 import type { CompanyProfile } from "@/types/domain";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -67,6 +84,14 @@ const PAY_METHODS = [
 const MOBILE_MONEY_METHODS = [
   { value: "mobile_money_mtn", label: "MTN Mobile Money" },
   { value: "mobile_money_airtel", label: "Airtel Money" },
+] as const;
+
+const INST_PAY_METHODS = [
+  { value: "cash", label: "Cash", emoji: "💵" },
+  { value: "mobile_money_mtn", label: "MTN", emoji: "📱" },
+  { value: "mobile_money_airtel", label: "Airtel", emoji: "📱" },
+  { value: "card", label: "Card", emoji: "💳" },
+  { value: "bank", label: "Bank", emoji: "🏦" },
 ] as const;
 
 // ─── Numpad ─────────────────────────────────────────────────────────────────
@@ -248,10 +273,10 @@ function ProductPicker({
 
 function InstallmentLookup({
   onClose,
-  onOpenPlan,
+  onSelectPlan,
 }: {
   onClose: () => void;
-  onOpenPlan: (id: string) => void;
+  onSelectPlan: (plan: InstallmentPlan) => void;
 }) {
   const [plans, setPlans] = useState<InstallmentPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -319,7 +344,7 @@ function InstallmentLookup({
                 {filtered.map((p) => (
                   <tr
                     key={p.id}
-                    onClick={() => onOpenPlan(p.id)}
+                    onClick={() => onSelectPlan(p)}
                     className="border-b hover:bg-amber-50 cursor-pointer"
                   >
                     <td className="py-2 px-3 font-semibold">{p.planNumber}</td>
@@ -350,7 +375,134 @@ function InstallmentLookup({
   );
 }
 
-// ─── Toolbar Button ──────────────────────────────────────────────────────────
+// ─── Installment pay widget (stays on POS) ───────────────────────────────────
+
+function InstallmentPayWidget({
+  remaining,
+  planNumber,
+  customer,
+  description,
+  previousPayments,
+  saving,
+  onClose,
+  onPay,
+}: {
+  remaining: number;
+  planNumber?: string;
+  customer: string;
+  description: string;
+  previousPayments: InstallmentPayment[];
+  saving: boolean;
+  onClose: () => void;
+  onPay: (amount: number, method: string) => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState("cash");
+  const parsed = Number(amount.replace(/,/g, ""));
+  const valid = Number.isFinite(parsed) && parsed > 0 && parsed <= remaining + 0.0001;
+  const history = [...previousPayments].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Installment payment</h2>
+            {planNumber && <p className="text-xs text-gray-500 mt-0.5">{planNumber}</p>}
+            <p className="text-sm text-gray-700 mt-1 font-medium">{customer}</p>
+            {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+          </div>
+          <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 mb-4">
+          <p className="text-[11px] uppercase tracking-wider text-amber-700 font-semibold">Remaining amount</p>
+          <p className="text-2xl font-black text-amber-800 tabular-nums">{formatCurrency(remaining)}</p>
+        </div>
+
+        <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
+          New installment
+        </label>
+        <div className="flex gap-2 mb-2">
+          <input
+            autoFocus
+            type="number"
+            min={1}
+            max={remaining}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="Enter amount"
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-lg font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+          <button
+            type="button"
+            onClick={() => setAmount(String(remaining))}
+            className="rounded-lg border border-amber-300 bg-amber-50 px-3 text-xs font-bold text-amber-800 hover:bg-amber-100"
+          >
+            Full
+          </button>
+        </div>
+        {amount !== "" && !valid && (
+          <p className="text-xs text-red-600 mb-2">
+            {parsed > remaining ? "Amount cannot exceed remaining balance." : "Enter an amount greater than 0."}
+          </p>
+        )}
+
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2 mt-3">Payment method</p>
+        <div className="grid grid-cols-5 gap-2 mb-4">
+          {INST_PAY_METHODS.map((m) => (
+            <button
+              key={m.value}
+              type="button"
+              onClick={() => setMethod(m.value)}
+              className={cn(
+                "flex flex-col items-center gap-1 rounded-lg border-2 py-2 text-[10px] font-semibold",
+                method === m.value
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+                  : "border-gray-200 text-gray-600 hover:border-emerald-300"
+              )}
+            >
+              <span className="text-lg">{m.emoji}</span>
+              {m.label}
+            </button>
+          ))}
+        </div>
+
+        {history.length > 0 && (
+          <div className="mb-4 rounded-lg border border-gray-200 overflow-hidden">
+            <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 px-3 py-2 bg-gray-50">
+              Previous payments
+            </p>
+            <div className="max-h-32 overflow-y-auto divide-y">
+              {history.map((p, i) => (
+                <div key={p.id} className="flex justify-between px-3 py-1.5 text-xs">
+                  <span className="text-gray-500">
+                    #{i + 1} {p.paidAt.toLocaleDateString("en-UG", { day: "2-digit", month: "short" })}
+                  </span>
+                  <span className="font-semibold tabular-nums">{formatCurrency(p.amount)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button
+          type="button"
+          disabled={saving || !valid}
+          onClick={() => onPay(parsed, method)}
+          className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-200 disabled:text-gray-400 text-white text-sm font-bold py-3 uppercase tracking-wide"
+        >
+          {saving ? "Processing…" : "Pay & Print"}
+        </button>
+        <button type="button" onClick={onClose} className="mt-2 w-full text-sm text-gray-400 hover:text-gray-600 py-2">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function ToolbarButton({
   label,
@@ -383,11 +535,10 @@ function ToolbarButton({
 // ─── Main POS Page ───────────────────────────────────────────────────────────
 
 export function PosPage() {
-  const router = useRouter();
   const { user } = useAuth();
   const barcodeRef = useRef<HTMLInputElement>(null);
-  const printRef = useRef<HTMLDivElement>(null);
   const savingRef = useRef(false);
+  const printNoticeTimer = useRef<number | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -404,8 +555,14 @@ export function PosPage() {
   const [mobileMoneyStep, setMobileMoneyStep] = useState(false);
   const [showInstallments, setShowInstallments] = useState(false);
   const [company, setCompany] = useState<CompanyProfile>(FALLBACK_COMPANY as CompanyProfile);
-  const [printSale, setPrintSale] = useState<ReceiptSale | null>(null);
-  const printedSaleId = useRef<string | null>(null);
+  const [printerReady, setPrinterReady] = useState(false);
+  const [showPrinterSettings, setShowPrinterSettings] = useState(false);
+  const [printNotice, setPrintNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [installmentWidget, setInstallmentWidget] = useState<{
+    mode: "existing" | "new";
+    plan: InstallmentPlan | null;
+    payments: InstallmentPayment[];
+  } | null>(null);
 
   const now = new Date();
   const timeStr = formatTime12h(now, true);
@@ -431,6 +588,8 @@ export function PosPage() {
       if (co) setCompany(co);
     });
   }, []);
+
+  useEffect(() => subscribePosPrinter(setPrinterReady), []);
 
   useEffect(() => {
     barcodeRef.current?.focus();
@@ -458,31 +617,30 @@ export function PosPage() {
     });
   }, [defaultTaxRate]);
 
-  useEffect(() => {
-    if (!printSale) return;
-    if (printedSaleId.current === printSale.id) return;
-    let attempts = 0;
-    let frame = 0;
-    const tryPrint = () => {
-      const area = printRef.current;
-      if (!area || !area.innerHTML.trim()) {
-        if (attempts++ < 24) frame = window.requestAnimationFrame(tryPrint);
-        return;
-      }
-      printedSaleId.current = printSale.id;
-      printReceiptHtml({
-        html: area.innerHTML,
-        title: printSale.saleNumber || "Receipt",
-        format: "thermal",
-        onAfterPrint: () => setPrintSale(null),
-      });
-    };
-    frame = window.requestAnimationFrame(tryPrint);
-    return () => window.cancelAnimationFrame(frame);
-  }, [printSale]);
+  const showPrintNotice = useCallback((ok: boolean, text: string) => {
+    setPrintNotice({ ok, text });
+    if (printNoticeTimer.current) window.clearTimeout(printNoticeTimer.current);
+    printNoticeTimer.current = window.setTimeout(() => setPrintNotice(null), 5000);
+  }, []);
+
+  const printPosReceipt = useCallback(async (job: { sale: ReceiptSale } | { installment: InstallmentReceiptModel } | { test: true }) => {
+    try {
+      const bytes = "test" in job
+        ? encodeTestReceipt(company)
+        : "sale" in job
+          ? encodeSaleReceipt(job.sale, company)
+          : encodeInstallmentReceipt(job.installment, company);
+      await printPosRaw(bytes);
+      setPrinterReady(true);
+      showPrintNotice(true, "test" in job ? "Test printed" : "Receipt printed");
+    } catch (err) {
+      setPrinterReady(false);
+      showPrintNotice(false, `Print failed: ${explainPrinterError(err)}`);
+    }
+  }, [company, showPrintNotice]);
 
   const handleBarcode = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (showPayWidget) return;
+    if (showPayWidget || installmentWidget) return;
     if (e.key === "Enter") {
       const val = barcodeInput.trim();
       const found = products.find(
@@ -582,6 +740,7 @@ export function PosPage() {
     setShowPicker(false);
     setShowCustomer(false);
     setShowInstallments(false);
+    setInstallmentWidget(null);
   }, []);
 
   const clearCart = () => {
@@ -625,10 +784,10 @@ export function PosPage() {
     };
 
     resetSaleSession();
-    setPrintSale(saleForPrint);
     barcodeRef.current?.focus();
     savingRef.current = false;
     setSaving(false);
+    void printPosReceipt({ sale: saleForPrint });
 
     try {
       const id = await createEntity("sales", salePayload);
@@ -643,7 +802,7 @@ export function PosPage() {
     } catch (err) {
       alert(err instanceof Error ? err.message : "Receipt printed, but the sale failed to save. Retry from Sales.");
     }
-  }, [cart, customerName, subtotal, taxTotal, grandTotal, paymentMethod, resetSaleSession]);
+  }, [cart, customerName, subtotal, taxTotal, grandTotal, paymentMethod, resetSaleSession, printPosReceipt]);
 
   const confirmSelectedPayment = useCallback((methodOverride?: string) => {
     if (savingRef.current || cart.length === 0) return;
@@ -659,7 +818,7 @@ export function PosPage() {
     if (!method) return;
     if (method === "installment") {
       setShowPayWidget(false);
-      router.push("/sales/installments/new");
+      setInstallmentWidget({ mode: "new", plan: null, payments: [] });
       return;
     }
     if (method === "mobile_money") {
@@ -669,7 +828,112 @@ export function PosPage() {
     }
     setShowPayWidget(false);
     void completeSale(method);
-  }, [cart.length, mobileMoneyStep, paymentMethod, completeSale, router]);
+  }, [cart.length, mobileMoneyStep, paymentMethod, completeSale]);
+
+  const openExistingInstallment = useCallback(async (plan: InstallmentPlan) => {
+    setShowInstallments(false);
+    setInstallmentWidget({ mode: "existing", plan, payments: [] });
+    try {
+      const payments = await listPaymentsForPlan(plan.id);
+      setInstallmentWidget((prev) => prev?.plan?.id === plan.id ? { ...prev, payments } : prev);
+    } catch {
+      /* widget still works with empty history */
+    }
+  }, []);
+
+  const submitInstallmentPayment = useCallback(async (amount: number, method: string) => {
+    if (!installmentWidget || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    const receivedBy = user ? `${user.firstName} ${user.lastName}`.trim() : undefined;
+    const paidAt = new Date();
+    const description = installmentWidget.plan?.description
+      ?? cart.map((i) => `${i.qty}× ${i.name}`).join(", ");
+    const customer = installmentWidget.plan?.customerName ?? customerName;
+    const totalAmount = installmentWidget.plan?.totalAmount ?? grandTotal;
+    const alreadyPaid = installmentWidget.plan?.amountPaid ?? 0;
+    const newPaid = alreadyPaid + amount;
+    const newBalance = Math.max(0, totalAmount - newPaid);
+    const planNumber = installmentWidget.plan?.planNumber ?? `INST-${Date.now()}`;
+    const planId = installmentWidget.plan?.id ?? planNumber;
+    const thisPayment: InstallmentPayment = {
+      id: `pos-${Date.now()}`,
+      planId,
+      amount,
+      profitEarned: 0,
+      costRecovered: amount,
+      paymentMethod: method,
+      notes: "POS installment",
+      receivedBy,
+      paidAt,
+      createdAt: paidAt,
+    };
+    const chronological = [
+      ...installmentWidget.payments,
+      thisPayment,
+    ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const planForPrint: InstallmentPlan = {
+      ...(installmentWidget.plan ?? {
+        id: planId,
+        customerPhone: undefined,
+        sellingPrice: totalAmount,
+        costPrice: 0,
+        expectedProfit: totalAmount,
+        profitRatio: 1,
+        costRatio: 0,
+        totalProfitRecognized: 0,
+        totalCostRecovered: 0,
+        planType: "shop",
+        createdAt: paidAt,
+      }),
+      id: planId,
+      planNumber,
+      customerName: customer,
+      description,
+      totalAmount,
+      amountPaid: newPaid,
+      totalPaid: newPaid,
+      balance: newBalance,
+      remainingBalance: newBalance,
+      status: newBalance <= 0 ? "completed" : "active",
+      updatedAt: paidAt,
+    };
+    const receipt: InstallmentReceiptModel = {
+      plan: planForPrint,
+      payment: thisPayment,
+      payments: chronological,
+      paymentNo: chronological.length,
+      paymentCount: chronological.length,
+    };
+
+    if (installmentWidget.mode === "new") resetSaleSession();
+    else setInstallmentWidget(null);
+    barcodeRef.current?.focus();
+    setSaving(false);
+    savingRef.current = false;
+    void printPosReceipt({ installment: receipt });
+
+    try {
+      let savedPlanId = installmentWidget.plan?.id;
+      if (!savedPlanId) {
+        if (cart.length === 0) throw new Error("Add items to the cart first.");
+        savedPlanId = await createInstallmentPlan({
+          planNumber,
+          customerName: customer,
+          description,
+          totalAmount,
+        });
+      }
+      await recordPayment(savedPlanId, {
+        amount,
+        paymentMethod: method,
+        receivedBy,
+        notes: "POS installment",
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Receipt printed, but the installment failed to save.");
+    }
+  }, [installmentWidget, cart, customerName, grandTotal, user, resetSaleSession, printPosReceipt]);
 
   const openPayWidget = useCallback(() => {
     if (cart.length === 0 || savingRef.current) return;
@@ -678,6 +942,17 @@ export function PosPage() {
     setShowPayWidget(true);
     barcodeRef.current?.blur();
   }, [cart.length]);
+
+  const handleConnectPrinter = useCallback(async () => {
+    try {
+      await connectPosPrinter();
+      setPrinterReady(true);
+      showPrintNotice(true, "Thermal printer selected");
+    } catch (err) {
+      setPrinterReady(false);
+      showPrintNotice(false, `Print failed: ${explainPrinterError(err)}`);
+    }
+  }, [showPrintNotice]);
 
   useEffect(() => {
     if (!showPayWidget) return;
@@ -726,13 +1001,6 @@ export function PosPage() {
 
   return (
     <DashboardLayout title="POS Terminal" requiredPermission="create_sales">
-    <div
-      ref={printRef}
-      aria-hidden
-      className="pointer-events-none fixed left-[-9999px] top-0"
-    >
-      {printSale && <ThermalReceipt sale={printSale} company={company} />}
-    </div>
     <div className="flex flex-col bg-gray-100 text-gray-900 overflow-hidden" style={{ height: "calc(100vh - 4rem)" }}>
 
       {/* ── Top Bar ── */}
@@ -741,6 +1009,16 @@ export function PosPage() {
         <span className="font-bold text-gray-800 tracking-wide">HOME STITCH INTERIORS UG — POS Terminal</span>
         <span className="text-gray-500">{user?.firstName} {user?.lastName}</span>
       </div>
+      {printNotice && (
+        <div
+          className={cn(
+            "px-4 py-2 text-sm font-semibold text-center",
+            printNotice.ok ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+          )}
+        >
+          {printNotice.text}
+        </div>
+      )}
 
       {/* ── Toolbar ── */}
       <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-200">
@@ -751,6 +1029,20 @@ export function PosPage() {
           icon={<CreditCard className="h-4 w-4" />}
           onClick={() => setShowInstallments(true)}
         />
+        <button
+          type="button"
+          onClick={() => setShowPrinterSettings(true)}
+          className={cn(
+            "flex flex-col items-center justify-center gap-0.5 rounded-lg px-4 py-1.5 text-xs font-medium transition-colors",
+            printerReady
+              ? "bg-black text-yellow-400 hover:bg-neutral-900"
+              : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+          )}
+          title={printerReady ? "Thermal printer connected" : "Select thermal printer"}
+        >
+          <Printer className={cn("h-5 w-5", printerReady ? "text-yellow-400 fill-yellow-400" : "text-gray-400")} />
+          Printer
+        </button>
         <button
           type="button"
           onClick={openPayWidget}
@@ -978,7 +1270,30 @@ export function PosPage() {
       {showInstallments && (
         <InstallmentLookup
           onClose={() => setShowInstallments(false)}
-          onOpenPlan={(id) => router.push(`/sales/installments/${id}`)}
+          onSelectPlan={(plan) => void openExistingInstallment(plan)}
+        />
+      )}
+
+      {showPrinterSettings && (
+        <PosPrinterSettingsModal
+          ready={printerReady}
+          supported={isPosPrinterSupported()}
+          onClose={() => setShowPrinterSettings(false)}
+          onSelectPrinter={() => void handleConnectPrinter()}
+          onTestPrint={() => void printPosReceipt({ test: true })}
+        />
+      )}
+
+      {installmentWidget && (
+        <InstallmentPayWidget
+          remaining={installmentWidget.plan ? installmentWidget.plan.balance : grandTotal}
+          planNumber={installmentWidget.plan?.planNumber}
+          customer={installmentWidget.plan?.customerName ?? customerName}
+          description={installmentWidget.plan?.description ?? cart.map((i) => i.name).join(", ")}
+          previousPayments={installmentWidget.payments}
+          saving={saving}
+          onClose={() => setInstallmentWidget(null)}
+          onPay={(amount, method) => void submitInstallmentPayment(amount, method)}
         />
       )}
 
