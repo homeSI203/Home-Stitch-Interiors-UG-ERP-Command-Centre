@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,6 +9,12 @@ import { useRouter } from "next/navigation";
 import { signIn } from "@/services/auth.service";
 import { FirebaseError } from "firebase/app";
 import { useAuthStore } from "@/store";
+import {
+  loadLastRememberedEmail,
+  loadRememberedEmails,
+  rememberLoginEmail,
+  removeRememberedEmail,
+} from "@/lib/remembered-emails";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +26,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, Mail, Lock, Sparkles } from "lucide-react";
+import { Loader2, Mail, Lock, Sparkles, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { COMPANY } from "@/lib/navigation";
 
@@ -29,28 +35,54 @@ const loginSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-type LoginForm = z.infer<typeof loginSchema>;
+type LoginFormValues = z.infer<typeof loginSchema>;
+
+const OTHER_EMAIL = "__other__";
 
 export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [savedEmails, setSavedEmails] = useState<string[]>([]);
+  const [useOtherEmail, setUseOtherEmail] = useState(false);
+  const passwordRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
   const setSession = useAuthStore((state) => state.setSession);
 
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
-  } = useForm<LoginForm>({
+  } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
   });
 
-  const onSubmit = async (data: LoginForm) => {
+  const emailValue = watch("email");
+  const { ref: passwordRegisterRef, ...passwordRegister } = register("password");
+
+  useEffect(() => {
+    const emails = loadRememberedEmails();
+    const last = loadLastRememberedEmail();
+    setSavedEmails(emails);
+    if (last) {
+      setValue("email", last);
+      setUseOtherEmail(false);
+      window.setTimeout(() => passwordRef.current?.focus(), 50);
+    } else {
+      setUseOtherEmail(true);
+    }
+  }, [setValue]);
+
+  const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     setError(null);
 
     try {
       const profile = await signIn(data.email, data.password);
+      rememberLoginEmail(data.email);
+      setSavedEmails(loadRememberedEmails());
       setSession(profile, profile.effectivePermissions);
       router.push("/dashboard");
     } catch (err) {
@@ -76,6 +108,32 @@ export function LoginForm() {
     }
   };
 
+  const selectEmail = (value: string) => {
+    if (value === OTHER_EMAIL) {
+      setUseOtherEmail(true);
+      setValue("email", "");
+      return;
+    }
+    setUseOtherEmail(false);
+    setValue("email", value, { shouldValidate: true });
+    window.setTimeout(() => passwordRef.current?.focus(), 30);
+  };
+
+  const forgetEmail = (email: string) => {
+    removeRememberedEmail(email);
+    const next = loadRememberedEmails();
+    setSavedEmails(next);
+    if (emailValue === email) {
+      if (next[0]) {
+        setValue("email", next[0]);
+        setUseOtherEmail(false);
+      } else {
+        setValue("email", "");
+        setUseOtherEmail(true);
+      }
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -97,7 +155,7 @@ export function LoginForm() {
         <CardHeader className="space-y-1 pb-4">
           <CardTitle className="text-xl">Welcome back</CardTitle>
           <CardDescription>
-            Sign in to your account to continue
+            Choose your email, then enter your password
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
@@ -110,16 +168,63 @@ export function LoginForm() {
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@company.com"
-                  className="pl-10"
-                  {...register("email")}
-                />
-              </div>
+              {savedEmails.length > 0 && !useOtherEmail ? (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <select
+                      id="email"
+                      className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      value={emailValue}
+                      onChange={(e) => selectEmail(e.target.value)}
+                    >
+                      {savedEmails.map((email) => (
+                        <option key={email} value={email}>
+                          {email}
+                        </option>
+                      ))}
+                      <option value={OTHER_EMAIL}>Use a different email…</option>
+                    </select>
+                  </div>
+                  {emailValue && savedEmails.includes(emailValue) && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => forgetEmail(emailValue)}
+                    >
+                      <X className="h-3 w-3" />
+                      Forget this email on this device
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      type="email"
+                      autoComplete="username"
+                      placeholder="you@company.com"
+                      className="pl-10"
+                      {...register("email")}
+                    />
+                  </div>
+                  {savedEmails.length > 0 && (
+                    <button
+                      type="button"
+                      className="text-xs text-brand-brown hover:underline"
+                      onClick={() => {
+                        setUseOtherEmail(false);
+                        setValue("email", savedEmails[0] || "");
+                        window.setTimeout(() => passwordRef.current?.focus(), 30);
+                      }}
+                    >
+                      Choose a saved email instead
+                    </button>
+                  )}
+                </div>
+              )}
               {errors.email && (
                 <p className="text-sm text-destructive">{errors.email.message}</p>
               )}
@@ -140,9 +245,14 @@ export function LoginForm() {
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="current-password"
                   placeholder="••••••••"
                   className="pl-10"
-                  {...register("password")}
+                  {...passwordRegister}
+                  ref={(el) => {
+                    passwordRegisterRef(el);
+                    passwordRef.current = el;
+                  }}
                 />
               </div>
               {errors.password && (
