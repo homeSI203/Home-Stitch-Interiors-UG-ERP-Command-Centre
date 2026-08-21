@@ -9,7 +9,9 @@
     "generate:pages": "node scripts/generate-pages.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "desktop": "yarn --cwd desktop start",
+    "dist:win": "next build && node scripts/prepare-standalone.mjs && yarn --cwd desktop dist"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

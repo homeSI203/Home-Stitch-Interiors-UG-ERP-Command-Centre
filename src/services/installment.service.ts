@@ -42,6 +42,20 @@ export interface InstallmentPlan {
   status: "active" | "completed" | "overdue";
   planType?: "shop" | "tailor";
   productType?: string;
+  bedsheetSize?: string;
+  quantity?: number;
+  meters?: number;
+  fabricTotal?: number;
+  needsPipes?: boolean;
+  pipeMeters?: number;
+  pipeUnitPrice?: number;
+  pipeTotal?: number;
+  holderPairs?: number;
+  holderUnitPrice?: number;
+  holderTotal?: number;
+  endingPairs?: number;
+  endingUnitPrice?: number;
+  endingTotal?: number;
   measurements?: string;
   materials?: string;
   materialCost?: number;
@@ -101,6 +115,20 @@ function toPlan(id: string, d: Record<string, unknown>): InstallmentPlan {
     status: (d.status as InstallmentPlan["status"]) ?? "active",
     planType: (d.planType as InstallmentPlan["planType"]) ?? "shop",
     productType: d.productType ? String(d.productType) : undefined,
+    bedsheetSize: d.bedsheetSize ? String(d.bedsheetSize) : undefined,
+    quantity: d.quantity !== undefined ? Number(d.quantity) : undefined,
+    meters: d.meters !== undefined ? Number(d.meters) : undefined,
+    fabricTotal: d.fabricTotal !== undefined ? Number(d.fabricTotal) : undefined,
+    needsPipes: d.needsPipes !== undefined ? Boolean(d.needsPipes) : undefined,
+    pipeMeters: d.pipeMeters !== undefined ? Number(d.pipeMeters) : undefined,
+    pipeUnitPrice: d.pipeUnitPrice !== undefined ? Number(d.pipeUnitPrice) : undefined,
+    pipeTotal: d.pipeTotal !== undefined ? Number(d.pipeTotal) : undefined,
+    holderPairs: d.holderPairs !== undefined ? Number(d.holderPairs) : undefined,
+    holderUnitPrice: d.holderUnitPrice !== undefined ? Number(d.holderUnitPrice) : undefined,
+    holderTotal: d.holderTotal !== undefined ? Number(d.holderTotal) : undefined,
+    endingPairs: d.endingPairs !== undefined ? Number(d.endingPairs) : undefined,
+    endingUnitPrice: d.endingUnitPrice !== undefined ? Number(d.endingUnitPrice) : undefined,
+    endingTotal: d.endingTotal !== undefined ? Number(d.endingTotal) : undefined,
     measurements: d.measurements ? String(d.measurements) : undefined,
     materials: d.materials ? String(d.materials) : undefined,
     materialCost: d.materialCost !== undefined ? Number(d.materialCost) : undefined,
@@ -147,13 +175,13 @@ export async function getInstallmentPlan(id: string): Promise<InstallmentPlan | 
 
 export async function createInstallmentPlan(
   data: Pick<InstallmentPlan, "planNumber" | "customerName" | "description" | "totalAmount"> &
-    Partial<Pick<InstallmentPlan, "customerPhone" | "planType" | "productType" | "measurements" | "materials" | "materialCost" | "laborCost" | "deliveryDate" | "costPrice">>
+    Partial<Omit<InstallmentPlan, "id" | "planNumber" | "customerName" | "description" | "totalAmount" | "createdAt" | "updatedAt">>
 ): Promise<string> {
   const db = getFirebaseDb();
   const sellingPrice = data.totalAmount;
   const costPrice =
     data.costPrice ??
-    (data.planType === "tailor" ? Number(data.materialCost ?? 0) : 0);
+    (data.planType === "tailor" ? Number(data.fabricTotal ?? data.materialCost ?? 0) : 0);
   const ratios = computeProfitRatios(sellingPrice, costPrice);
 
   const payload: Record<string, unknown> = {
@@ -177,13 +205,36 @@ export async function createInstallmentPlan(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
-  if (data.customerPhone)              payload.customerPhone  = data.customerPhone;
-  if (data.productType)                payload.productType    = data.productType;
-  if (data.measurements)               payload.measurements   = data.measurements;
-  if (data.materials)                  payload.materials      = data.materials;
-  if (data.materialCost !== undefined) payload.materialCost   = data.materialCost;
-  if (data.laborCost    !== undefined) payload.laborCost      = data.laborCost;
-  if (data.deliveryDate)               payload.deliveryDate   = data.deliveryDate;
+  const extra = data as Record<string, unknown>;
+  const optionalKeys = [
+    "customerPhone",
+    "productType",
+    "bedsheetSize",
+    "quantity",
+    "meters",
+    "fabricTotal",
+    "needsPipes",
+    "pipeMeters",
+    "pipeUnitPrice",
+    "pipeTotal",
+    "holderPairs",
+    "holderUnitPrice",
+    "holderTotal",
+    "endingPairs",
+    "endingUnitPrice",
+    "endingTotal",
+    "measurements",
+    "materials",
+    "materialCost",
+    "laborCost",
+    "deliveryDate",
+  ];
+  for (const key of optionalKeys) {
+    const value = extra[key];
+    if (value !== undefined && value !== "" && value !== false) {
+      payload[key] = value;
+    }
+  }
   const ref = await addDoc(collection(db, "installments"), payload);
   return ref.id;
 }

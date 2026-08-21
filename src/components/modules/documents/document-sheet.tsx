@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Printer, ArrowLeft } from "lucide-react";
+import { FileDown, Printer, ArrowLeft } from "lucide-react";
 import { A4_SHEET_PRINT_STYLES, printHtmlDocument, useAutoPrint } from "@/lib/print-receipt";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
@@ -580,8 +580,11 @@ export function DocumentSheetPage({ config }: { config: DocumentSheetConfig }) {
               <ArrowLeft className="mr-2 h-4 w-4" /> Back
             </Link>
           </Button>
+          <Button variant="outline" onClick={handlePrint} disabled={loading || !data}>
+            <Printer className="mr-2 h-4 w-4" /> Print
+          </Button>
           <Button variant="gold" onClick={handlePrint} disabled={loading || !data}>
-            <Printer className="mr-2 h-4 w-4" /> Print / Save PDF
+            <FileDown className="mr-2 h-4 w-4" /> Export PDF
           </Button>
         </div>
       </div>

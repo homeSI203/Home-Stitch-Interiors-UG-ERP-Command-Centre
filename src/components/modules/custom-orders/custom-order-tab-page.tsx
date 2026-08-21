@@ -11,9 +11,9 @@ import { getEntity } from "@/services/entity.service";
 import { ENTITY_MODULES } from "@/lib/erp/modules";
 
 const TAB_FIELDS: Record<string, string[]> = {
-  measurements: ["measurements", "productType"],
-  materials: ["materials", "materialCost", "meters"],
-  labor: ["laborCost", "total", "productionStage"],
+  measurements: ["productType", "bedsheetSize", "meters", "pipeMeters"],
+  materials: ["materials", "materialCost", "meters", "pipeMeters", "pipeTotal", "holderPairs", "holderTotal", "endingPairs", "endingTotal"],
+  labor: ["pipeTotal", "holderTotal", "endingTotal", "total", "productionStage"],
   timeline: ["productionStage", "createdAt", "deliveryDate"],
   delivery: ["deliveryDate", "customerName", "address"],
 };

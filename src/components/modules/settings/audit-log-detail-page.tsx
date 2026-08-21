@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader, formatCellValue } from "@/components/erp/page-header";
+import { BackToPreviousPage } from "@/components/erp/back-to-previous-page";
 import { getEntity } from "@/services/entity.service";
 
 export function AuditLogDetailPage() {
@@ -31,7 +32,10 @@ export function AuditLogDetailPage() {
               ))}
             </dl>
           ) : (
-            <p className="text-muted-foreground">Log not found.</p>
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-muted-foreground">Log not found.</p>
+              <BackToPreviousPage />
+            </div>
           )}
         </CardContent>
       </Card>

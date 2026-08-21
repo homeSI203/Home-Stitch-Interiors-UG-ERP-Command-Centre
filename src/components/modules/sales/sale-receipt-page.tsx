@@ -9,6 +9,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Loader2, Printer, ArrowLeft, LayoutTemplate } from "lucide-react";
 import { printReceiptHtml, useAutoPrint } from "@/lib/print-receipt";
 import type { CompanyProfile } from "@/types/domain";
+import { BackToPreviousPage } from "@/components/erp/back-to-previous-page";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -388,7 +389,10 @@ export function SaleReceiptPage() {
             <A4Receipt sale={sale} company={company} />
           )
         ) : (
-          <p className="text-center text-gray-400 py-20">Receipt not found.</p>
+          <div className="flex flex-col items-center justify-center gap-3 py-20">
+            <p className="text-center text-gray-400">Receipt not found.</p>
+            <BackToPreviousPage />
+          </div>
         )}
       </div>
 

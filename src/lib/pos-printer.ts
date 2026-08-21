@@ -1,5 +1,7 @@
 "use client";
 
+import { isDesktopPos, loadDesktopPrinterName, printDesktopRaw } from "@/lib/pos-desktop";
+
 type SerialPortLike = {
   readable: ReadableStream<Uint8Array> | null;
   writable: WritableStream<Uint8Array> | null;
@@ -72,10 +74,11 @@ function pickSavedPort(ports: SerialPortLike[], saved: SavedPrinter | null) {
 }
 
 export function isPosPrinterSupported() {
-  return serialApi() !== null;
+  return isDesktopPos() || serialApi() !== null;
 }
 
 export function isPosPrinterConnected() {
+  if (isDesktopPos()) return Boolean(loadDesktopPrinterName());
   return !!(port && port.writable);
 }
 
@@ -86,8 +89,11 @@ export function hasSavedPosPrinter() {
 export function explainPrinterError(err: unknown): string {
   const name = typeof err === "object" && err && "name" in err ? String((err as { name: string }).name) : "";
   const msg = err instanceof Error ? err.message : String(err);
+  if (isDesktopPos()) {
+    return msg || "Thermal printer failed.";
+  }
   if (!serialApi()) {
-    return "This browser cannot drive the thermal printer. Open POS in Chrome or Edge.";
+    return "This browser cannot drive the thermal printer. Use the Windows ERP app, or open POS in Chrome or Edge.";
   }
   if (name === "NotFoundError" || /No port selected|cancelled/i.test(msg)) {
     return "No thermal printer was selected.";
@@ -180,6 +186,10 @@ export async function connectPosPrinter() {
 }
 
 export async function printPosRaw(bytes: Uint8Array) {
+  if (isDesktopPos()) {
+    await printDesktopRaw(bytes);
+    return;
+  }
   if (!isPosPrinterConnected()) {
     const reused = await reconnectPosPrinter();
     if (!reused) {
@@ -205,6 +215,13 @@ export async function printPosRaw(bytes: Uint8Array) {
 }
 
 export function subscribePosPrinter(onChange: (connected: boolean) => void) {
+  if (isDesktopPos()) {
+    const notify = () => onChange(Boolean(loadDesktopPrinterName()));
+    notify();
+    window.addEventListener("hsi-printer-changed", notify);
+    return () => window.removeEventListener("hsi-printer-changed", notify);
+  }
+
   const serial = serialApi();
   if (!serial) {
     onChange(false);

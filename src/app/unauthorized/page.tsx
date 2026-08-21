@@ -83,6 +83,9 @@ export default function UnauthorizedPage() {
                 "Sync my access"
               )}
             </Button>
+            <Button type="button" variant="outline" onClick={() => router.back()}>
+              Back to previous page
+            </Button>
             <Button asChild variant="outline">
               <Link href="/auth/login">Sign in again</Link>
             </Button>

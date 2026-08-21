@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Printer } from "lucide-react";
+import { ArrowLeft, FileDown, Loader2, Printer } from "lucide-react";
 import { A4_SHEET_PRINT_STYLES, printHtmlDocument, useAutoPrint } from "@/lib/print-receipt";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
+import { BackToPreviousPage } from "@/components/erp/back-to-previous-page";
 import { getEntity } from "@/services/entity.service";
 import { getCompanyProfile } from "@/services/company.service";
 import type { CompanyProfile } from "@/types/domain";
@@ -376,9 +377,13 @@ export function ReceiptPdfPage() {
               Back
             </Link>
           </Button>
-          <Button variant="gold" onClick={handlePrint} disabled={loading}>
+          <Button variant="outline" onClick={handlePrint} disabled={loading}>
             <Printer className="mr-2 h-4 w-4" />
-            Print / Save PDF
+            Print
+          </Button>
+          <Button variant="gold" onClick={handlePrint} disabled={loading}>
+            <FileDown className="mr-2 h-4 w-4" />
+            Export PDF
           </Button>
         </div>
       </div>
@@ -389,7 +394,10 @@ export function ReceiptPdfPage() {
           <p className="text-sm text-muted-foreground">Loading receipt…</p>
         </div>
       ) : !data ? (
-        <p className="text-muted-foreground">Receipt not found.</p>
+        <div className="flex flex-col items-start gap-3 py-4">
+          <p className="text-muted-foreground">Receipt not found.</p>
+          <BackToPreviousPage />
+        </div>
       ) : (
         <div className="flex justify-center print:block">
           <div

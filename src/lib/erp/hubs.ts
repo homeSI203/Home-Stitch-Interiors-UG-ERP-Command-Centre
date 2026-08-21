@@ -29,6 +29,8 @@ export const HUB_CONFIGS: Record<string, HubConfig> = {
     links: [
       { title: "POS Terminal", description: "Quick checkout", href: "/sales/pos", permission: "create_sales" },
       { title: "New Sale", description: "Create a sale", href: "/sales/new", permission: "create_sales" },
+      { title: "Receipts", description: "Manage payment receipts", href: "/receipts", permission: "view_receipts" },
+      { title: "New Receipt", description: "Record a receipt", href: "/receipts/new", permission: "manage_receipts" },
       { title: "Installments", description: "Partial payment plans", href: "/sales/installments", permission: "view_sales" },
       { title: "Sales History", description: "All sales records", href: "/sales/history", permission: "view_sales" },
       { title: "Returns", description: "Process returns", href: "/sales/returns", permission: "create_sales" },

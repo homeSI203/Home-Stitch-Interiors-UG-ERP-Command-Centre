@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Printer } from "lucide-react";
+import { ArrowLeft, FileDown, Loader2, Printer } from "lucide-react";
 import { A4_SHEET_PRINT_STYLES, printHtmlDocument, useAutoPrint } from "@/lib/print-receipt";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
+import { BackToPreviousPage } from "@/components/erp/back-to-previous-page";
 import { getEntity } from "@/services/entity.service";
 import { getCompanyProfile } from "@/services/company.service";
 import type { CompanyProfile } from "@/types/domain";
@@ -75,8 +76,36 @@ function CustomOrderSheet({
   const laborCost = Number(data.laborCost ?? 0);
   const materialCost = Number(data.materialCost ?? 0);
   const meters = Number(data.meters ?? 0);
-  const materialTotal = Math.round(materialCost * meters);
-  const total = Number(data.total ?? laborCost + materialTotal);
+  const quantity = Number(data.quantity ?? 0);
+  const fabricTotal = Number(
+    data.fabricTotal ??
+      (String(data.productType ?? "").toLowerCase().includes("bed")
+        ? Math.round(quantity * materialCost)
+        : Math.round(materialCost * meters))
+  );
+  const pipeMeters = Number(data.pipeMeters ?? 0);
+  const pipeUnitPrice = Number(data.pipeUnitPrice ?? 0);
+  const pipeTotal = Number(data.pipeTotal ?? Math.round(pipeMeters * pipeUnitPrice));
+  const holderPairs = Number(data.holderPairs ?? 0);
+  const holderUnitPrice = Number(data.holderUnitPrice ?? 0);
+  const holderTotal = Number(data.holderTotal ?? Math.round(holderPairs * holderUnitPrice));
+  const endingPairs = Number(data.endingPairs ?? 0);
+  const endingUnitPrice = Number(data.endingUnitPrice ?? 0);
+  const endingTotal = Number(data.endingTotal ?? Math.round(endingPairs * endingUnitPrice));
+  const fittingQty = Number(data.fittingQty ?? 0);
+  const fittingUnitPrice = Number(data.fittingUnitPrice ?? 0);
+  const legacyFittingTotal = fittingQty > 0 ? Math.round(fittingQty * fittingUnitPrice) : 0;
+  const fittingTotal = Number(data.fittingTotal ?? holderTotal + endingTotal + legacyFittingTotal);
+  const total = Number(data.total ?? fabricTotal + pipeTotal + fittingTotal + laborCost);
+  const productType = String(data.productType ?? "—");
+  const bedsheetSize = String(data.bedsheetSize ?? "").trim();
+  const needsPipes =
+    Boolean(data.needsPipes) ||
+    pipeTotal > 0 ||
+    pipeMeters > 0 ||
+    holderTotal > 0 ||
+    endingTotal > 0 ||
+    legacyFittingTotal > 0;
 
   const GREEN = "#1F3D2B";
   const GOLD = "#C9A24A";
@@ -123,7 +152,6 @@ function CustomOrderSheet({
   });
 
   const description = String(data.description ?? "").trim() || "—";
-  const measurements = String(data.measurements ?? "").trim() || "—";
   const materials = String(data.materials ?? "").trim() || "—";
 
   const sectionTitle = (label: string, compact = false) => (
@@ -257,13 +285,17 @@ function CustomOrderSheet({
           <tbody>
             <tr>
               <td style={labelCell()}>Product Type</td>
-              <td style={valueCell()} colSpan={3}>{String(data.productType ?? "—")}</td>
+              <td style={valueCell()}>{productType}</td>
+              <td style={labelCell()}>{bedsheetSize ? "Size" : "Fabric"}</td>
+              <td style={valueCell()}>
+                {bedsheetSize
+                  ? `${bedsheetSize}${quantity ? ` × ${quantity}` : ""}`
+                  : meters ? `${meters} m` : "—"}
+              </td>
             </tr>
             <tr>
               <td style={labelCell(true)}>Description</td>
-              <td style={valueCell(true)}>{description}</td>
-              <td style={labelCell(true)}>Measurements</td>
-              <td style={valueCell(true)}>{measurements}</td>
+              <td style={valueCell(true)} colSpan={3}>{description}</td>
             </tr>
             <tr>
               <td style={labelCell()}>Materials</td>
@@ -282,18 +314,70 @@ function CustomOrderSheet({
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td style={cell}>Labor Cost</td>
-            <td style={{ ...cell, textAlign: "right" }}>—</td>
-            <td style={{ ...cell, textAlign: "right", fontWeight: 600 }}>{fmtUGX(laborCost)}</td>
-          </tr>
-          <tr>
-            <td style={cellAlt}>Material Cost</td>
-            <td style={{ ...cellAlt, textAlign: "right" }}>
-              {meters} m × UGX {fmtUGX(materialCost)}/m
-            </td>
-            <td style={{ ...cellAlt, textAlign: "right", fontWeight: 600 }}>{fmtUGX(materialTotal)}</td>
-          </tr>
+          {bedsheetSize ? (
+            <tr>
+              <td style={cell}>Bedsheets</td>
+              <td style={{ ...cell, textAlign: "right" }}>
+                {bedsheetSize} × {quantity || 1} @ UGX {fmtUGX(materialCost)}
+              </td>
+              <td style={{ ...cell, textAlign: "right", fontWeight: 600 }}>{fmtUGX(fabricTotal)}</td>
+            </tr>
+          ) : (
+            <tr>
+              <td style={cell}>Fabric</td>
+              <td style={{ ...cell, textAlign: "right" }}>
+                {meters} m × UGX {fmtUGX(materialCost)}/m
+              </td>
+              <td style={{ ...cell, textAlign: "right", fontWeight: 600 }}>{fmtUGX(fabricTotal)}</td>
+            </tr>
+          )}
+          {needsPipes ? (
+            <>
+              {pipeMeters > 0 || pipeTotal > 0 ? (
+                <tr>
+                  <td style={cellAlt}>Pipes</td>
+                  <td style={{ ...cellAlt, textAlign: "right" }}>
+                    {pipeMeters} m × UGX {fmtUGX(pipeUnitPrice)}/m
+                  </td>
+                  <td style={{ ...cellAlt, textAlign: "right", fontWeight: 600 }}>{fmtUGX(pipeTotal)}</td>
+                </tr>
+              ) : null}
+              {holderPairs > 0 || holderTotal > 0 ? (
+                <tr>
+                  <td style={cell}>Curtain Holders</td>
+                  <td style={{ ...cell, textAlign: "right" }}>
+                    {holderPairs} pair{holderPairs === 1 ? "" : "s"} × UGX {fmtUGX(holderUnitPrice)}
+                  </td>
+                  <td style={{ ...cell, textAlign: "right", fontWeight: 600 }}>{fmtUGX(holderTotal)}</td>
+                </tr>
+              ) : null}
+              {endingPairs > 0 || endingTotal > 0 ? (
+                <tr>
+                  <td style={cellAlt}>Pipe Endings</td>
+                  <td style={{ ...cellAlt, textAlign: "right" }}>
+                    {endingPairs} pair{endingPairs === 1 ? "" : "s"} × UGX {fmtUGX(endingUnitPrice)}
+                  </td>
+                  <td style={{ ...cellAlt, textAlign: "right", fontWeight: 600 }}>{fmtUGX(endingTotal)}</td>
+                </tr>
+              ) : null}
+              {legacyFittingTotal > 0 && holderTotal === 0 && endingTotal === 0 ? (
+                <tr>
+                  <td style={cell}>Pipe Fittings</td>
+                  <td style={{ ...cell, textAlign: "right" }}>
+                    {fittingQty} × UGX {fmtUGX(fittingUnitPrice)}
+                  </td>
+                  <td style={{ ...cell, textAlign: "right", fontWeight: 600 }}>{fmtUGX(legacyFittingTotal)}</td>
+                </tr>
+              ) : null}
+            </>
+          ) : null}
+          {laborCost > 0 ? (
+            <tr>
+              <td style={cellAlt}>Labor Cost</td>
+              <td style={{ ...cellAlt, textAlign: "right" }}>—</td>
+              <td style={{ ...cellAlt, textAlign: "right", fontWeight: 600 }}>{fmtUGX(laborCost)}</td>
+            </tr>
+          ) : null}
         </tbody>
       </table>
 
@@ -452,9 +536,13 @@ export function CustomOrderPdfPage() {
               Back
             </Link>
           </Button>
-          <Button variant="gold" onClick={handlePrint} disabled={loading}>
+          <Button variant="outline" onClick={handlePrint} disabled={loading}>
             <Printer className="mr-2 h-4 w-4" />
-            Print / Save PDF
+            Print
+          </Button>
+          <Button variant="gold" onClick={handlePrint} disabled={loading}>
+            <FileDown className="mr-2 h-4 w-4" />
+            Export PDF
           </Button>
         </div>
       </div>
@@ -465,7 +553,10 @@ export function CustomOrderPdfPage() {
           <p className="text-sm text-muted-foreground">Loading document…</p>
         </div>
       ) : !data ? (
-        <p className="text-muted-foreground">Order not found.</p>
+        <div className="flex flex-col items-start gap-3 py-4">
+          <p className="text-muted-foreground">Order not found.</p>
+          <BackToPreviousPage />
+        </div>
       ) : (
         <div className="flex justify-center print:block">
           <div

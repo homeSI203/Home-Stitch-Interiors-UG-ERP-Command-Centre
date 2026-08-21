@@ -11,6 +11,7 @@ import { PermissionGate } from "@/components/auth/permission-gate";
 import { getEntity } from "@/services/entity.service";
 import { receivePurchase } from "@/services/purchase.service";
 import { ensurePurchasePayable } from "@/services/purchase-payment.service";
+import { BackToPreviousPage } from "@/components/erp/back-to-previous-page";
 
 function fmtUGX(n: number) {
   return new Intl.NumberFormat("en-UG", { maximumFractionDigits: 0 }).format(n);
@@ -95,7 +96,10 @@ export default function PurchaseDetailPage() {
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-brand-gold" /></div>
       ) : !data ? (
-        <p className="text-muted-foreground font-ui">Purchase not found.</p>
+        <div className="flex flex-col items-start gap-3 py-4">
+          <p className="text-muted-foreground font-ui">Purchase not found.</p>
+          <BackToPreviousPage />
+        </div>
       ) : (
         <div className="max-w-5xl space-y-6">
           <div className="page-section p-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 font-ui text-sm">

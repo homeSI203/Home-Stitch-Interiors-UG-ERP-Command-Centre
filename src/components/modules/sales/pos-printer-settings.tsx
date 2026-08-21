@@ -2,18 +2,29 @@
 
 import { Printer, Usb, X } from "lucide-react";
 import { hasSavedPosPrinter } from "@/lib/pos-printer";
+import type { DesktopPrinter } from "@/lib/pos-desktop";
 
 export function PosPrinterSettingsModal({
   ready,
   supported,
+  desktop,
+  printers,
+  selectedPrinter,
   onClose,
   onSelectPrinter,
+  onSelectWindowsPrinter,
+  onRefreshPrinters,
   onTestPrint,
 }: {
   ready: boolean;
   supported: boolean;
+  desktop?: boolean;
+  printers?: DesktopPrinter[];
+  selectedPrinter?: string;
   onClose: () => void;
   onSelectPrinter: () => void;
+  onSelectWindowsPrinter?: (name: string) => void;
+  onRefreshPrinters?: () => void;
   onTestPrint: () => void;
 }) {
   return (
@@ -29,33 +40,66 @@ export function PosPrinterSettingsModal({
           </button>
         </div>
 
-        <div className={`rounded-xl border px-4 py-3 mb-4 ${ready ? "border-yellow-300 bg-yellow-50" : "border-amber-200 bg-amber-50"}`}>
-          <p className="text-sm font-semibold text-gray-900">
-            {ready ? "Thermal printer connected and saved" : hasSavedPosPrinter() ? "Saved printer is unplugged" : "No thermal printer selected"}
-          </p>
-          <p className="text-xs text-gray-600 mt-1">
-            {supported
-              ? ready
-                ? "This till will print automatically after Pay. You do not need to select the printer again."
-                : "Plug in the saved USB till printer. Select again only if you changed printers."
-              : "Open this POS in Chrome or Edge to use the thermal printer."}
-          </p>
-        </div>
+        {desktop ? (
+          <>
+            <div className={`rounded-xl border px-4 py-3 mb-4 ${ready ? "border-yellow-300 bg-yellow-50" : "border-amber-200 bg-amber-50"}`}>
+              <p className="text-sm font-semibold text-gray-900">
+                {ready ? "Windows USB printer saved" : "Select the USB till printer"}
+              </p>
+              <p className="text-xs text-gray-600 mt-1">
+                This Windows app lists USB printers (USB001). Firebase stays the database. Pay prints here with no Chrome preview.
+              </p>
+            </div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1">Windows printers</label>
+            <select
+              value={selectedPrinter || ""}
+              onChange={(e) => onSelectWindowsPrinter?.(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm text-gray-900 bg-white"
+            >
+              <option value="">Select a printer</option>
+              {(printers ?? []).map((printer) => (
+                <option key={printer.name} value={printer.name}>
+                  {printer.displayName || printer.name}
+                  {printer.port ? ` — ${printer.port}` : ""}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={onRefreshPrinters}
+              className="mt-2 w-full rounded-xl border border-gray-200 hover:bg-gray-50 text-sm font-semibold py-3 text-gray-800"
+            >
+              Refresh printer list
+            </button>
+          </>
+        ) : (
+          <>
+            <div className={`rounded-xl border px-4 py-3 mb-4 ${ready ? "border-yellow-300 bg-yellow-50" : "border-amber-200 bg-amber-50"}`}>
+              <p className="text-sm font-semibold text-gray-900">
+                {ready ? "COM thermal printer connected" : hasSavedPosPrinter() ? "Saved COM printer is unplugged" : "No COM printer selected"}
+              </p>
+              <p className="text-xs text-gray-600 mt-1">
+                {supported
+                  ? "Chrome only lists COM ports. For USB printers, use the Windows ERP app (yarn desktop / the installer)."
+                  : "Use the Windows ERP app to print to USB till printers."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onSelectPrinter}
+              disabled={!supported}
+              className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-200 disabled:text-gray-400 text-white text-sm font-bold py-3"
+            >
+              <Usb className="inline h-4 w-4 mr-2" />
+              {ready ? "Change COM printer" : "Select COM printer"}
+            </button>
+          </>
+        )}
 
         <button
           type="button"
-          onClick={onSelectPrinter}
-          disabled={!supported}
-          className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-200 disabled:text-gray-400 text-white text-sm font-bold py-3"
-        >
-          <Usb className="inline h-4 w-4 mr-2" />
-          {ready ? "Change thermal printer" : "Select thermal printer"}
-        </button>
-        <button
-          type="button"
           onClick={onTestPrint}
-          disabled={!supported}
-          className="mt-2 w-full rounded-xl border border-gray-200 hover:bg-gray-50 text-sm font-semibold py-3 text-gray-800 disabled:text-gray-400"
+          className="mt-2 w-full rounded-xl border border-gray-200 hover:bg-gray-50 text-sm font-semibold py-3 text-gray-800"
         >
           <Printer className="inline h-4 w-4 mr-2" />
           Test print

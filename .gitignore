@@ -44,3 +44,9 @@ next-env.d.ts
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+
+# windows app
+/desktop/node_modules
+/desktop/dist
+/dist-windows
+/release

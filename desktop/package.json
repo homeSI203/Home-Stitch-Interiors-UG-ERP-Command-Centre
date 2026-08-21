@@ -1,0 +1,62 @@
+{
+  "name": "home-stitch-erp-desktop",
+  "version": "1.1.0",
+  "private": true,
+  "author": "Home Stitch Interiors UG",
+  "description": "Home Stitch ERP Windows app — Firebase remains the database",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^34.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "ug.homestitch.erp",
+    "productName": "Home Stitch ERP",
+    "copyright": "Home Stitch Interiors UG",
+    "directories": {
+      "output": "../dist-windows"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "loading.html",
+      "icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "../.next/standalone",
+        "to": "next"
+      },
+      {
+        "from": "print-raw.ps1",
+        "to": "print-raw.ps1"
+      },
+      {
+        "from": "icon.png",
+        "to": "icon.png"
+      }
+    ],
+    "win": {
+      "icon": "icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "Home-Stitch-ERP-Setup-${version}.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Home Stitch ERP"
+    }
+  }
+}

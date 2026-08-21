@@ -16,7 +16,8 @@ import {
   CreditCard,
 } from "lucide-react";
 import { cn, formatCurrency, formatTime12h } from "@/lib/utils";
-import { createEntity, listEntities } from "@/services/entity.service";
+import { createEntity, getEntity, listEntities } from "@/services/entity.service";
+import { markInvoicePaid } from "@/services/custom-order-invoice.service";
 import { getCompanyProfile } from "@/services/company.service";
 import {
   createInstallmentPlan,
@@ -32,10 +33,19 @@ import { encodeInstallmentReceipt, encodeSaleReceipt, encodeTestReceipt } from "
 import {
   connectPosPrinter,
   explainPrinterError,
+  isPosPrinterConnected,
   isPosPrinterSupported,
   printPosRaw,
   subscribePosPrinter,
 } from "@/lib/pos-printer";
+import {
+  isDesktopPos,
+  listDesktopPrinters,
+  loadDesktopPrinterName,
+  saveDesktopPrinterName,
+  type DesktopPrinter,
+} from "@/lib/pos-desktop";
+import { bytesToBase64, queuePosPrintJob } from "@/lib/pos-print-jobs";
 import { PosPrinterSettingsModal } from "@/components/modules/sales/pos-printer-settings";
 import {
   FALLBACK_COMPANY,
@@ -539,6 +549,7 @@ export function PosPage() {
   const barcodeRef = useRef<HTMLInputElement>(null);
   const savingRef = useRef(false);
   const printNoticeTimer = useRef<number | null>(null);
+  const linkedInvoiceId = useRef<string | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -558,6 +569,8 @@ export function PosPage() {
   const [printerReady, setPrinterReady] = useState(false);
   const [showPrinterSettings, setShowPrinterSettings] = useState(false);
   const [printNotice, setPrintNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [desktopPrinters, setDesktopPrinters] = useState<DesktopPrinter[]>([]);
+  const [desktopPrinterName, setDesktopPrinterName] = useState("");
   const [installmentWidget, setInstallmentWidget] = useState<{
     mode: "existing" | "new";
     plan: InstallmentPlan | null;
@@ -589,7 +602,55 @@ export function PosPage() {
     });
   }, []);
 
+  useEffect(() => {
+    const invoiceId = new URLSearchParams(window.location.search).get("invoice");
+    if (!invoiceId) return;
+    linkedInvoiceId.current = invoiceId;
+    getEntity<Record<string, unknown>>("invoices", invoiceId).then((inv) => {
+      if (!inv) return;
+      setCustomerName(String(inv.customerName ?? "Walk-in Customer"));
+      const label = [inv.orderNumber, inv.notes, inv.invoiceNumber]
+        .map((v) => String(v ?? "").trim())
+        .find(Boolean) || "Custom Order";
+      setCart([
+        {
+          productId: `invoice:${invoiceId}`,
+          name: label.slice(0, 80),
+          sku: String(inv.invoiceNumber ?? "INV"),
+          price: Number(inv.total ?? 0),
+          qty: 1,
+          taxRate: 0,
+        },
+      ]);
+    });
+  }, []);
+
   useEffect(() => subscribePosPrinter(setPrinterReady), []);
+
+  const refreshDesktopPrinters = useCallback(async () => {
+    if (!isDesktopPos()) return;
+    const list = await listDesktopPrinters();
+    setDesktopPrinters(list);
+    const saved = loadDesktopPrinterName();
+    const next =
+      (saved && list.some((printer) => printer.name === saved) && saved) ||
+      list.find((printer) => /USB|DOT4/i.test(printer.port))?.name ||
+      list.find((printer) => printer.isDefault)?.name ||
+      list[0]?.name ||
+      "";
+    if (next) {
+      saveDesktopPrinterName(next);
+      setDesktopPrinterName(next);
+      setPrinterReady(true);
+    } else {
+      setDesktopPrinterName("");
+      setPrinterReady(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshDesktopPrinters();
+  }, [refreshDesktopPrinters]);
 
   useEffect(() => {
     barcodeRef.current?.focus();
@@ -624,20 +685,45 @@ export function PosPage() {
   }, []);
 
   const printPosReceipt = useCallback(async (job: { sale: ReceiptSale } | { installment: InstallmentReceiptModel } | { test: true }) => {
+    const kind = "test" in job ? "test" : "sale" in job ? "sale" : "installment";
+    const bytes = kind === "test"
+      ? encodeTestReceipt(company)
+      : kind === "sale" && "sale" in job
+        ? encodeSaleReceipt(job.sale, company)
+        : encodeInstallmentReceipt((job as { installment: InstallmentReceiptModel }).installment, company);
+    const okText = kind === "test" ? "Test printed" : "Receipt printed";
     try {
-      const bytes = "test" in job
-        ? encodeTestReceipt(company)
-        : "sale" in job
-          ? encodeSaleReceipt(job.sale, company)
-          : encodeInstallmentReceipt(job.installment, company);
-      await printPosRaw(bytes);
-      setPrinterReady(true);
-      showPrintNotice(true, "test" in job ? "Test printed" : "Receipt printed");
+      if (isDesktopPos() && !isPosPrinterConnected()) {
+        showPrintNotice(false, "Print failed: select a USB printer in Printer settings.");
+        return;
+      }
+      if (isPosPrinterConnected()) {
+        await printPosRaw(bytes);
+        setPrinterReady(true);
+        showPrintNotice(true, okText);
+        return;
+      }
+      await queuePosPrintJob({
+        kind,
+        payloadBase64: bytesToBase64(bytes),
+        createdBy: user?.uid || user?.id || "",
+        createdByName: [user?.firstName, user?.lastName].filter(Boolean).join(" "),
+      });
+      showPrintNotice(
+        true,
+        kind === "test"
+          ? "Test sent to Windows till printer"
+          : "Receipt sent to Windows till printer"
+      );
     } catch (err) {
       setPrinterReady(false);
-      showPrintNotice(false, `Print failed: ${explainPrinterError(err)}`);
+      const raw = err instanceof Error ? err.message : String(err);
+      const text = /permission|insufficient/i.test(raw)
+        ? "Print failed: publish Firestore rules for the till printer, then try again."
+        : `Print failed: ${explainPrinterError(err)}`;
+      showPrintNotice(false, text);
     }
-  }, [company, showPrintNotice]);
+  }, [company, showPrintNotice, user]);
 
   const handleBarcode = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (showPayWidget || installmentWidget) return;
@@ -799,6 +885,10 @@ export function PosPage() {
         amount: grandTotal,
         paymentMethod: chosenMethod,
       });
+      if (linkedInvoiceId.current) {
+        await markInvoicePaid(linkedInvoiceId.current, { saleId: id });
+        linkedInvoiceId.current = null;
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Receipt printed, but the sale failed to save. Retry from Sales.");
     }
@@ -1278,8 +1368,18 @@ export function PosPage() {
         <PosPrinterSettingsModal
           ready={printerReady}
           supported={isPosPrinterSupported()}
+          desktop={isDesktopPos()}
+          printers={desktopPrinters}
+          selectedPrinter={desktopPrinterName}
           onClose={() => setShowPrinterSettings(false)}
           onSelectPrinter={() => void handleConnectPrinter()}
+          onSelectWindowsPrinter={(name) => {
+            saveDesktopPrinterName(name);
+            setDesktopPrinterName(name);
+            setPrinterReady(Boolean(name));
+            showPrintNotice(true, name ? "USB printer saved" : "No printer selected");
+          }}
+          onRefreshPrinters={() => void refreshDesktopPrinters()}
           onTestPrint={() => void printPosReceipt({ test: true })}
         />
       )}

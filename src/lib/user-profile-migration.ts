@@ -46,7 +46,9 @@ function splitDisplayName(displayName: string): {
 
 function normalizeRoleId(roleId: string): string {
   const trimmed = roleId.trim();
-  return LEGACY_ROLE_MAP[trimmed] ?? trimmed;
+  const compact = trimmed.toLowerCase().replace(/[\s_-]+/g, "");
+  if (compact === "superadmin") return SUPER_ADMIN_ROLE;
+  return LEGACY_ROLE_MAP[trimmed] ?? LEGACY_ROLE_MAP[trimmed.toLowerCase()] ?? trimmed;
 }
 
 function migrateLegacyRoles(data: Record<string, unknown>): string[] {

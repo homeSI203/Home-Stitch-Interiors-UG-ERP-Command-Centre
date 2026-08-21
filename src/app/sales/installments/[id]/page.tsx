@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Loader2, CreditCard, CheckCircle2, AlertCircle, Receipt, Printer } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
+import { BackToPreviousPage } from "@/components/erp/back-to-previous-page";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
@@ -131,7 +132,7 @@ export default function InstallmentDetailPage() {
       <DashboardLayout title="Installment" requiredPermission="view_sales">
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <p className="font-ui text-muted-foreground">Plan not found.</p>
-          <Button asChild variant="outline"><Link href="/sales/installments">← Back</Link></Button>
+          <BackToPreviousPage />
         </div>
       </DashboardLayout>
     );
@@ -214,7 +215,7 @@ export default function InstallmentDetailPage() {
               <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6 font-ui text-sm">
                 {plan.productType && (
                   <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Garment Type</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Product Type</p>
                     <p className="font-semibold">{plan.productType}</p>
                   </div>
                 )}
@@ -224,22 +225,63 @@ export default function InstallmentDetailPage() {
                     <p className="font-semibold">{new Date(plan.deliveryDate).toLocaleDateString("en-UG", { day: "2-digit", month: "long", year: "numeric" })}</p>
                   </div>
                 )}
-                {(plan.materialCost !== undefined || plan.laborCost !== undefined) && (
-                  <div className="sm:col-span-2 grid grid-cols-3 gap-4">
+                {plan.bedsheetSize && (
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Bedsheet Size</p>
+                    <p className="font-semibold">{plan.bedsheetSize}{plan.quantity ? ` × ${plan.quantity}` : ""}</p>
+                  </div>
+                )}
+                {plan.meters !== undefined && plan.meters > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Fabric Meters</p>
+                    <p className="font-semibold tabular-nums">{plan.meters} m</p>
+                  </div>
+                )}
+                <div className="sm:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {(plan.fabricTotal !== undefined || plan.materialCost !== undefined) && (
                     <div className="rounded-lg border border-border/50 p-3 text-center">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Material</p>
-                      <p className="font-bold tabular-nums mt-0.5">UGX {fmtUGX(plan.materialCost ?? 0)}</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Fabric</p>
+                      <p className="font-bold tabular-nums mt-0.5">UGX {fmtUGX(plan.fabricTotal ?? plan.materialCost ?? 0)}</p>
                     </div>
+                  )}
+                  {(plan.pipeTotal ?? 0) > 0 && (
+                    <div className="rounded-lg border border-border/50 p-3 text-center">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Pipes</p>
+                      <p className="font-bold tabular-nums mt-0.5">UGX {fmtUGX(plan.pipeTotal ?? 0)}</p>
+                      {plan.pipeMeters ? (
+                        <p className="text-[11px] text-muted-foreground mt-0.5">{plan.pipeMeters} m</p>
+                      ) : null}
+                    </div>
+                  )}
+                  {(plan.holderTotal ?? 0) > 0 && (
+                    <div className="rounded-lg border border-border/50 p-3 text-center">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Holders</p>
+                      <p className="font-bold tabular-nums mt-0.5">UGX {fmtUGX(plan.holderTotal ?? 0)}</p>
+                      {plan.holderPairs ? (
+                        <p className="text-[11px] text-muted-foreground mt-0.5">{plan.holderPairs} pair(s)</p>
+                      ) : null}
+                    </div>
+                  )}
+                  {(plan.endingTotal ?? 0) > 0 && (
+                    <div className="rounded-lg border border-border/50 p-3 text-center">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Endings</p>
+                      <p className="font-bold tabular-nums mt-0.5">UGX {fmtUGX(plan.endingTotal ?? 0)}</p>
+                      {plan.endingPairs ? (
+                        <p className="text-[11px] text-muted-foreground mt-0.5">{plan.endingPairs} pair(s)</p>
+                      ) : null}
+                    </div>
+                  )}
+                  {(plan.laborCost ?? 0) > 0 && (
                     <div className="rounded-lg border border-border/50 p-3 text-center">
                       <p className="text-xs text-muted-foreground uppercase tracking-wider">Labour</p>
                       <p className="font-bold tabular-nums mt-0.5">UGX {fmtUGX(plan.laborCost ?? 0)}</p>
                     </div>
-                    <div className="rounded-lg border-2 border-brand-green/30 bg-brand-green/5 p-3 text-center">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Total</p>
-                      <p className="font-bold tabular-nums text-brand-green mt-0.5">UGX {fmtUGX(plan.totalAmount)}</p>
-                    </div>
+                  )}
+                  <div className="rounded-lg border-2 border-brand-green/30 bg-brand-green/5 p-3 text-center">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Total</p>
+                    <p className="font-bold tabular-nums text-brand-green mt-0.5">UGX {fmtUGX(plan.totalAmount)}</p>
                   </div>
-                )}
+                </div>
                 {plan.measurements && (
                   <div className="sm:col-span-2">
                     <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Measurements</p>

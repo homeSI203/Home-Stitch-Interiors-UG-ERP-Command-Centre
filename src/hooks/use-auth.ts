@@ -18,18 +18,19 @@ export function useAuth() {
 export function useAuthorization() {
   const { user, effectivePermissions } = useAuthStore();
   const roles = user?.roles;
+  const email = user?.email;
 
   return {
     user,
     roles,
     effectivePermissions,
     hasPermission: (permission: string) =>
-      checkPermission(effectivePermissions, roles, permission),
+      checkPermission(effectivePermissions, roles, permission, email),
     hasRole: (roleId: string) => checkRole(roles, roleId),
     hasAnyRole: (roleIds: string[]) => checkAnyRole(roles, roleIds),
     canAccessRoute: (pathname: string) =>
-      checkRouteAccess(effectivePermissions, roles, pathname),
-    isSuperAdmin: checkSuperAdmin(roles),
+      checkRouteAccess(effectivePermissions, roles, pathname, email),
+    isSuperAdmin: checkSuperAdmin(roles, email),
   };
 }
 

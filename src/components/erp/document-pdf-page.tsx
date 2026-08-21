@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Printer } from "lucide-react";
-import { useAutoPrint } from "@/lib/print-receipt";
+import { FileDown, Printer } from "lucide-react";
+import { A4_SHEET_PRINT_STYLES, printHtmlDocument, useAutoPrint } from "@/lib/print-receipt";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,15 +47,26 @@ export function DocumentPdfPage({
     });
   }, [config.collection, id]);
 
-  const handlePrint = useCallback(() => window.print(), []);
-  useAutoPrint(!loading && !!data, handlePrint);
-
   const docNumber =
     data?.quotationNumber ??
     data?.proformaNumber ??
     data?.invoiceNumber ??
     data?.receiptNumber ??
     id;
+
+  const handlePrint = useCallback(() => {
+    const el = document.getElementById("document-print");
+    if (!el) {
+      window.print();
+      return;
+    }
+    printHtmlDocument({
+      html: el.innerHTML,
+      title: `${DOC_LABELS[docType]} ${docNumber}`,
+      styles: A4_SHEET_PRINT_STYLES,
+    });
+  }, [docType, docNumber]);
+  useAutoPrint(!loading && !!data, handlePrint);
 
   return (
     <DashboardLayout title={`${DOC_LABELS[docType]} PDF`} requiredPermission={permission}>
@@ -65,9 +76,13 @@ export function DocumentPdfPage({
           <>
             <Button variant="outline" onClick={handlePrint}>
               <Printer className="mr-2 h-4 w-4" />
-              Print / Save PDF
+              Print
             </Button>
-            <Button asChild variant="gold">
+            <Button variant="gold" onClick={handlePrint}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Export PDF
+            </Button>
+            <Button asChild variant="outline">
               <Link href={`${config.basePath}/${id}`}>View Details</Link>
             </Button>
           </>

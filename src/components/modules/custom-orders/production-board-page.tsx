@@ -114,17 +114,37 @@ function OrderCard({
         </p>
       )}
 
-      {/* Advance button */}
-      {!isLast && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onAdvance(); }}
-          disabled={isUpdating}
-          className="mt-2.5 w-full flex items-center justify-center gap-1 text-xs font-semibold font-ui py-1.5 rounded-lg border border-border/60 text-muted-foreground hover:border-brand-gold hover:text-brand-gold hover:bg-brand-gold/5 transition-all opacity-0 group-hover:opacity-100"
-        >
-          → {nextLabel} <ChevronRight className="h-3 w-3" />
-        </button>
-      )}
+      {/* Advance / Confirm */}
+      <div className="mt-2.5 space-y-1.5">
+        {!order.invoiceId && (
+          <Link
+            href={`/custom-orders/${orderId}/confirm`}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full flex items-center justify-center gap-1 text-xs font-semibold font-ui py-1.5 rounded-lg border border-brand-gold/40 text-brand-gold hover:bg-brand-gold/10 transition-all"
+          >
+            Confirm → Invoice
+          </Link>
+        )}
+        {order.invoiceId ? (
+          <Link
+            href={`/invoices/${String(order.invoiceId)}`}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full flex items-center justify-center gap-1 text-xs font-semibold font-ui py-1.5 rounded-lg border border-brand-green/40 text-brand-green hover:bg-brand-green/10 transition-all"
+          >
+            View Invoice
+          </Link>
+        ) : null}
+        {!isLast && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onAdvance(); }}
+            disabled={isUpdating}
+            className="w-full flex items-center justify-center gap-1 text-xs font-semibold font-ui py-1.5 rounded-lg border border-border/60 text-muted-foreground hover:border-brand-gold hover:text-brand-gold hover:bg-brand-gold/5 transition-all opacity-0 group-hover:opacity-100"
+          >
+            → {nextLabel} <ChevronRight className="h-3 w-3" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

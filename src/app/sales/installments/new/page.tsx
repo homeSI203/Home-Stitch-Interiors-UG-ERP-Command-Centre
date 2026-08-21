@@ -5,14 +5,15 @@ import { useRouter } from "next/navigation";
 import {
   Loader2, Plus, Trash2, Search, X, Package, Scissors,
   ShoppingBag, ChevronRight, ChevronLeft, Check, AlertCircle,
-  Ruler, Palette, Calendar,
+  Palette, Calendar,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createInstallmentPlan } from "@/services/installment.service";
-import { listEntities } from "@/services/entity.service";
+import { getEntity, listEntities } from "@/services/entity.service";
+import { linkInvoiceToInstallment } from "@/services/custom-order-invoice.service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,13 +40,23 @@ interface SelectedItem {
   amount: number;
 }
 
+type CustomProductType = "bedsheets" | "curtains" | "";
+
 interface TailorForm {
-  productType: string;
+  productType: CustomProductType;
+  bedsheetSize: string;
+  quantity: number;
   description: string;
-  measurements: string;
   materials: string;
-  materialCost: string;
-  laborCost: string;
+  materialCost: number;
+  meters: number;
+  needsPipes: boolean;
+  pipeMeters: number;
+  pipeUnitPrice: number;
+  holderPairs: number;
+  holderUnitPrice: number;
+  endingPairs: number;
+  endingUnitPrice: number;
   deliveryDate: string;
 }
 
@@ -60,6 +71,72 @@ interface CustomerForm {
 
 function fmtUGX(n: number) {
   return new Intl.NumberFormat("en-UG", { maximumFractionDigits: 0 }).format(n);
+}
+
+const PRODUCT_TYPES: { value: Exclude<CustomProductType, "">; label: string }[] = [
+  { value: "bedsheets", label: "Bedsheets" },
+  { value: "curtains", label: "Curtains" },
+];
+
+const BEDSHEET_SIZES = ["4*6", "5*6", "6*6", "King Size"] as const;
+
+function productTypeLabel(type: CustomProductType): string {
+  if (type === "bedsheets") return "Bedsheets";
+  if (type === "curtains") return "Curtains";
+  return "";
+}
+
+function parseProductType(value: unknown): CustomProductType {
+  const s = String(value ?? "").toLowerCase();
+  if (s.includes("curtain")) return "curtains";
+  if (s.includes("bed")) return "bedsheets";
+  return "";
+}
+
+function emptyTailorForm(): TailorForm {
+  return {
+    productType: "",
+    bedsheetSize: "",
+    quantity: 1,
+    description: "",
+    materials: "",
+    materialCost: 0,
+    meters: 1,
+    needsPipes: false,
+    pipeMeters: 0,
+    pipeUnitPrice: 0,
+    holderPairs: 0,
+    holderUnitPrice: 0,
+    endingPairs: 0,
+    endingUnitPrice: 0,
+    deliveryDate: "",
+  };
+}
+
+function computeTailorTotals(form: TailorForm) {
+  const pipesOn = form.productType === "curtains" && form.needsPipes;
+  const fabricTotal =
+    form.productType === "bedsheets"
+      ? Math.round(Number(form.quantity || 0) * Number(form.materialCost || 0))
+      : form.productType === "curtains"
+        ? Math.round(Number(form.meters || 0) * Number(form.materialCost || 0))
+        : 0;
+  const pipeTotal = pipesOn
+    ? Math.round(Number(form.pipeMeters || 0) * Number(form.pipeUnitPrice || 0))
+    : 0;
+  const holderTotal = pipesOn
+    ? Math.round(Number(form.holderPairs || 0) * Number(form.holderUnitPrice || 0))
+    : 0;
+  const endingTotal = pipesOn
+    ? Math.round(Number(form.endingPairs || 0) * Number(form.endingUnitPrice || 0))
+    : 0;
+  return {
+    fabricTotal,
+    pipeTotal,
+    holderTotal,
+    endingTotal,
+    total: fabricTotal + pipeTotal + holderTotal + endingTotal,
+  };
 }
 
 // ─── Wizard Step Indicator ────────────────────────────────────────────────────
@@ -114,7 +191,7 @@ function StepTypeSelection({ onSelect }: { onSelect: (t: PlanType) => void }) {
             type: "tailor" as PlanType,
             icon: Scissors,
             title: "Tailor / Custom Order",
-            desc: "Custom-made garment — enter measurements, fabric & labour costs",
+            desc: "Bedsheets or curtains — capture size, fabric meters, pipes, holder pairs and endings",
           },
         ].map(({ type, icon: Icon, title, desc }) => (
           <button
@@ -354,15 +431,19 @@ function StepShopItems({
 
 // ─── Step 2B: Tailor / Custom Order Form ─────────────────────────────────────
 
-function StepTailorOrder({ form, onChange }: { form: TailorForm; onChange: (k: keyof TailorForm, v: string) => void }) {
-  const matCost  = Number(form.materialCost) || 0;
-  const labCost  = Number(form.laborCost)    || 0;
-  const total    = matCost + labCost;
+function StepTailorOrder({
+  form,
+  onChange,
+}: {
+  form: TailorForm;
+  onChange: <K extends keyof TailorForm>(k: K, v: TailorForm[K]) => void;
+}) {
+  const totals = computeTailorTotals(form);
+  const selectClass =
+    "mt-1.5 flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-ui";
 
   return (
     <div className="space-y-5">
-
-      {/* Order details */}
       <div className="page-section animate-fade-in">
         <div className="px-6 py-3 border-b border-border/60 bg-brand-gold/5 flex items-center gap-2">
           <Scissors className="h-3.5 w-3.5 text-brand-gold" />
@@ -371,14 +452,18 @@ function StepTailorOrder({ form, onChange }: { form: TailorForm; onChange: (k: k
         <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div>
             <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Garment / Product Type *
+              Product Type *
             </Label>
-            <Input
-              className="mt-1.5 font-ui"
+            <select
+              className={selectClass}
               value={form.productType}
-              onChange={(e) => onChange("productType", e.target.value)}
-              placeholder="e.g. Suit, Dress, Kaftan, Shirt, Kanzu…"
-            />
+              onChange={(e) => onChange("productType", e.target.value as CustomProductType)}
+            >
+              <option value="">Select product…</option>
+              {PRODUCT_TYPES.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
           <div>
             <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
@@ -404,28 +489,12 @@ function StepTailorOrder({ form, onChange }: { form: TailorForm; onChange: (k: k
         </div>
       </div>
 
-      {/* Measurements */}
-      <div className="page-section animate-fade-in">
-        <div className="px-6 py-3 border-b border-border/60 bg-brand-gold/5 flex items-center gap-2">
-          <Ruler className="h-3.5 w-3.5 text-brand-gold" />
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-ui">Measurements</p>
-        </div>
-        <div className="p-6">
-          <textarea
-            value={form.measurements}
-            onChange={(e) => onChange("measurements", e.target.value)}
-            placeholder={`Enter body measurements, e.g.:\nChest: 40"\nWaist: 34"\nHips: 42"\nLength: 28"\nSleeve: 25"\nShoulder: 18"`}
-            rows={6}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-ui focus:outline-none focus:ring-2 focus:ring-brand-gold/40 resize-y"
-          />
-        </div>
-      </div>
-
-      {/* Materials & Costs */}
       <div className="page-section animate-fade-in">
         <div className="px-6 py-3 border-b border-border/60 bg-brand-gold/5 flex items-center gap-2">
           <Palette className="h-3.5 w-3.5 text-brand-gold" />
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-ui">Materials & Costs</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-ui">
+            {form.productType === "bedsheets" ? "Bedsheet Details" : form.productType === "curtains" ? "Curtain Details" : "Product Details"}
+          </p>
         </div>
         <div className="p-6 space-y-5">
           <div>
@@ -435,39 +504,160 @@ function StepTailorOrder({ form, onChange }: { form: TailorForm; onChange: (k: k
             <textarea
               value={form.materials}
               onChange={(e) => onChange("materials", e.target.value)}
-              placeholder="e.g. Black Italian wool, gold buttons, white silk lining…"
-              rows={3}
+              placeholder="e.g. Cotton bedsheet set, or curtain fabric name…"
+              rows={2}
               className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-ui focus:outline-none focus:ring-2 focus:ring-brand-gold/40 resize-none"
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 items-end">
-            <div>
-              <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Material Cost (UGX) *
-              </Label>
-              <Input
-                type="number" min={0} className="mt-1.5 font-ui text-lg font-bold"
-                value={form.materialCost}
-                onChange={(e) => onChange("materialCost", e.target.value)}
-                placeholder="0"
-              />
+
+          {form.productType === "bedsheets" && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              <div>
+                <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Size *</Label>
+                <select
+                  className={selectClass}
+                  value={form.bedsheetSize}
+                  onChange={(e) => onChange("bedsheetSize", e.target.value)}
+                >
+                  <option value="">Select size…</option>
+                  {BEDSHEET_SIZES.map((size) => (
+                    <option key={size} value={size}>{size}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</Label>
+                <Input
+                  type="number" min={1} className="mt-1.5 font-ui"
+                  value={form.quantity || ""}
+                  onChange={(e) => onChange("quantity", Number(e.target.value))}
+                />
+              </div>
+              <div>
+                <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unit Price (UGX)</Label>
+                <Input
+                  type="number" min={0} className="mt-1.5 font-ui"
+                  value={form.materialCost || ""}
+                  onChange={(e) => onChange("materialCost", Number(e.target.value))}
+                />
+              </div>
             </div>
+          )}
+
+          {form.productType === "curtains" && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fabric Meters *</Label>
+                  <Input
+                    type="number" min={0} step="0.01" className="mt-1.5 font-ui"
+                    value={form.meters || ""}
+                    onChange={(e) => onChange("meters", Number(e.target.value))}
+                  />
+                </div>
+                <div>
+                  <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fabric Cost per Meter (UGX)</Label>
+                  <Input
+                    type="number" min={0} className="mt-1.5 font-ui"
+                    value={form.materialCost || ""}
+                    onChange={(e) => onChange("materialCost", Number(e.target.value))}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground font-ui">Fabric: UGX {fmtUGX(totals.fabricTotal)}</p>
+
+              <div className="rounded-lg border border-border/70 bg-muted/20 p-4 space-y-4">
+                <label className="flex items-center gap-2.5 text-sm font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.needsPipes}
+                    onChange={(e) => onChange("needsPipes", e.target.checked)}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                  Pipes needed
+                </label>
+                {form.needsPipes && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pipe Meters</Label>
+                      <Input
+                        type="number" min={0} step="0.01" className="mt-1.5 font-ui"
+                        value={form.pipeMeters || ""}
+                        onChange={(e) => onChange("pipeMeters", Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Price per Pipe Meter (UGX)</Label>
+                      <Input
+                        type="number" min={0} className="mt-1.5 font-ui"
+                        value={form.pipeUnitPrice || ""}
+                        onChange={(e) => onChange("pipeUnitPrice", Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pipe Total</Label>
+                      <Input readOnly value={fmtUGX(totals.pipeTotal)} className="mt-1.5 bg-muted/50 font-semibold tabular-nums" />
+                    </div>
+                    <div>
+                      <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Curtain Holders (pairs)</Label>
+                      <Input
+                        type="number" min={0} className="mt-1.5 font-ui"
+                        value={form.holderPairs || ""}
+                        onChange={(e) => onChange("holderPairs", Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Price per Holder Pair (UGX)</Label>
+                      <Input
+                        type="number" min={0} className="mt-1.5 font-ui"
+                        value={form.holderUnitPrice || ""}
+                        onChange={(e) => onChange("holderUnitPrice", Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Holders Total</Label>
+                      <Input readOnly value={fmtUGX(totals.holderTotal)} className="mt-1.5 bg-muted/50 font-semibold tabular-nums" />
+                    </div>
+                    <div>
+                      <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pipe Endings (pairs)</Label>
+                      <Input
+                        type="number" min={0} className="mt-1.5 font-ui"
+                        value={form.endingPairs || ""}
+                        onChange={(e) => onChange("endingPairs", Number(e.target.value))}
+                      />
+                    </div>
+                    <div>
+                      <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Price per Ending Pair (UGX)</Label>
+                      <Input
+                        type="number" min={0} className="mt-1.5 font-ui"
+                        value={form.endingUnitPrice || ""}
+                        onChange={(e) => onChange("endingUnitPrice", Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">Endings Total</Label>
+                      <Input readOnly value={fmtUGX(totals.endingTotal)} className="mt-1.5 bg-muted/50 font-semibold tabular-nums" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          <div className="rounded-xl border-2 border-brand-green/30 bg-brand-green/5 p-4 text-center sm:text-left sm:flex sm:items-center sm:justify-between">
             <div>
-              <Label className="font-ui text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Labour Cost (UGX) *
-              </Label>
-              <Input
-                type="number" min={0} className="mt-1.5 font-ui text-lg font-bold"
-                value={form.laborCost}
-                onChange={(e) => onChange("laborCost", e.target.value)}
-                placeholder="0"
-              />
-            </div>
-            <div className="rounded-xl border-2 border-brand-green/30 bg-brand-green/5 p-4 text-center">
               <p className="text-xs font-ui text-muted-foreground uppercase tracking-wider">Total Amount</p>
-              <p className="text-2xl font-bold tabular-nums text-brand-green mt-1">UGX {fmtUGX(total)}</p>
-              <p className="text-xs text-muted-foreground font-ui mt-0.5">Material + Labour</p>
+              <p className="text-xs text-muted-foreground font-ui mt-0.5">
+                {form.productType === "bedsheets"
+                  ? "Quantity × Unit Price"
+                  : form.productType === "curtains" && form.needsPipes
+                    ? "Fabric + Pipes + Holders + Endings"
+                    : form.productType === "curtains"
+                      ? "Fabric meters × cost per meter"
+                      : "Select a product type"}
+              </p>
             </div>
+            <p className="text-2xl font-bold tabular-nums text-brand-green mt-1">UGX {fmtUGX(totals.total)}</p>
           </div>
         </div>
       </div>
@@ -525,6 +715,8 @@ export default function NewInstallmentPage() {
   const [planType, setPlanType] = useState<PlanType | null>(null);
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState<string | null>(null);
+  const [invoiceId, setInvoiceId] = useState<string | null>(null);
+  const [invoiceTotal, setInvoiceTotal] = useState(0);
 
   // Shop items state
   const [products, setProducts]               = useState<Product[]>([]);
@@ -533,16 +725,59 @@ export default function NewInstallmentPage() {
   const [items, setItems]                     = useState<SelectedItem[]>([]);
 
   // Tailor form state
-  const [tailorForm, setTailorForm] = useState<TailorForm>({
-    productType: "", description: "", measurements: "",
-    materials: "", materialCost: "", laborCost: "", deliveryDate: "",
-  });
+  const [tailorForm, setTailorForm] = useState<TailorForm>(emptyTailorForm);
 
   // Customer form state
   const [customerForm, setCustomerForm] = useState<CustomerForm>({
     planNumber: `INST-${Date.now().toString().slice(-6)}`,
     customerName: "", customerPhone: "", notes: "",
   });
+
+  useEffect(() => {
+    const fromInvoice = new URLSearchParams(window.location.search).get("invoice");
+    if (!fromInvoice) return;
+    setInvoiceId(fromInvoice);
+    (async () => {
+      const invoice = await getEntity<Record<string, unknown>>("invoices", fromInvoice);
+      if (!invoice) return;
+      setInvoiceTotal(Number(invoice.total ?? 0));
+      setCustomerForm((prev) => ({
+        ...prev,
+        customerName: String(invoice.customerName ?? prev.customerName),
+        customerPhone: String(invoice.customerPhone ?? prev.customerPhone),
+        notes: invoice.orderNumber ? `Invoice ${invoice.invoiceNumber} · ${invoice.orderNumber}` : prev.notes,
+      }));
+      const orderId = invoice.customOrderId ? String(invoice.customOrderId) : "";
+      if (orderId) {
+        const order = await getEntity<Record<string, unknown>>("customOrders", orderId);
+        if (order) {
+          const productType = parseProductType(order.productType);
+          setTailorForm({
+            productType,
+            bedsheetSize: String(order.bedsheetSize ?? ""),
+            quantity: Number(order.quantity ?? 1) || 1,
+            description: String(order.description ?? ""),
+            materials: String(order.materials ?? ""),
+            materialCost: Number(order.materialCost ?? 0),
+            meters: Number(order.meters ?? 0),
+            needsPipes: Boolean(order.needsPipes) || Number(order.pipeMeters ?? 0) > 0,
+            pipeMeters: Number(order.pipeMeters ?? 0),
+            pipeUnitPrice: Number(order.pipeUnitPrice ?? 0),
+            holderPairs: Number(order.holderPairs ?? 0),
+            holderUnitPrice: Number(order.holderUnitPrice ?? 0),
+            endingPairs: Number(order.endingPairs ?? 0),
+            endingUnitPrice: Number(order.endingUnitPrice ?? 0),
+            deliveryDate: String(order.deliveryDate ?? ""),
+          });
+          setPlanType("tailor");
+          setStep(2);
+          return;
+        }
+      }
+      setPlanType("tailor");
+      setStep(2);
+    })();
+  }, []);
 
   useEffect(() => {
     listEntities<Record<string, unknown>>("products").then((r) => {
@@ -582,20 +817,37 @@ export default function NewInstallmentPage() {
 
   const shopTotal     = items.reduce((s, i) => s + i.amount, 0);
   const shopTotalCost = items.reduce((s, i) => s + i.costPrice * i.qty, 0);
-  const tailorTotal   = (Number(tailorForm.materialCost) || 0) + (Number(tailorForm.laborCost) || 0);
+  const tailorTotals = computeTailorTotals(tailorForm);
+  const tailorTotal   = tailorTotals.total || invoiceTotal;
   const totalAmount   = planType === "tailor" ? tailorTotal : shopTotal;
-  const totalCost     = planType === "tailor" ? (Number(tailorForm.materialCost) || 0) : shopTotalCost;
+  const totalCost     = planType === "tailor" ? tailorTotals.fabricTotal : shopTotalCost;
 
   const canProceedStep2 = () => {
-    if (planType === "shop")   return items.length > 0;
-    if (planType === "tailor") return !!tailorForm.productType.trim() && tailorTotal > 0;
+    if (planType === "shop") return items.length > 0;
+    if (planType === "tailor") {
+      if (tailorForm.productType === "bedsheets") {
+        return !!tailorForm.bedsheetSize && tailorTotal > 0;
+      }
+      if (tailorForm.productType === "curtains") {
+        return Number(tailorForm.meters) > 0 && tailorTotal > 0;
+      }
+      return false;
+    }
     return false;
   };
 
   const handleSave = async () => {
     if (!customerForm.customerName.trim()) { setError("Customer name is required."); return; }
     if (planType === "shop"   && items.length === 0)              { setError("Select at least one item."); return; }
-    if (planType === "tailor" && !tailorForm.productType.trim())  { setError("Garment type is required."); return; }
+    if (planType === "tailor" && !tailorForm.productType) { setError("Product type is required."); return; }
+    if (planType === "tailor" && tailorForm.productType === "bedsheets" && !tailorForm.bedsheetSize) {
+      setError("Bedsheet size is required.");
+      return;
+    }
+    if (planType === "tailor" && tailorForm.productType === "curtains" && !(Number(tailorForm.meters) > 0)) {
+      setError("Curtain meters are required.");
+      return;
+    }
     if (totalAmount <= 0) { setError("Total amount must be greater than zero."); return; }
 
     setSaving(true);
@@ -608,14 +860,31 @@ export default function NewInstallmentPage() {
         description = items.map((i) => `${i.name} ×${i.qty}`).join(", ");
         if (customerForm.notes) description += ` — ${customerForm.notes}`;
       } else {
-        description = tailorForm.productType;
+        const pipesOn = tailorForm.productType === "curtains" && tailorForm.needsPipes;
+        description = productTypeLabel(tailorForm.productType);
+        if (tailorForm.productType === "bedsheets" && tailorForm.bedsheetSize) {
+          description += ` ${tailorForm.bedsheetSize}`;
+        }
         if (tailorForm.description) description += ` — ${tailorForm.description}`;
         if (customerForm.notes) description += ` | ${customerForm.notes}`;
-        extra.productType  = tailorForm.productType;
+        extra.productType = productTypeLabel(tailorForm.productType);
+        extra.bedsheetSize = tailorForm.productType === "bedsheets" ? tailorForm.bedsheetSize : "";
+        extra.quantity = tailorForm.productType === "bedsheets" ? Number(tailorForm.quantity) || 1 : 0;
         extra.materialCost = Number(tailorForm.materialCost) || 0;
-        extra.laborCost    = Number(tailorForm.laborCost)    || 0;
-        if (tailorForm.measurements) extra.measurements = tailorForm.measurements;
-        if (tailorForm.materials)    extra.materials    = tailorForm.materials;
+        extra.meters = tailorForm.productType === "curtains" ? Number(tailorForm.meters) || 0 : 0;
+        extra.fabricTotal = tailorTotals.fabricTotal;
+        extra.needsPipes = pipesOn;
+        extra.pipeMeters = pipesOn ? Number(tailorForm.pipeMeters) || 0 : 0;
+        extra.pipeUnitPrice = pipesOn ? Number(tailorForm.pipeUnitPrice) || 0 : 0;
+        extra.pipeTotal = tailorTotals.pipeTotal;
+        extra.holderPairs = pipesOn ? Number(tailorForm.holderPairs) || 0 : 0;
+        extra.holderUnitPrice = pipesOn ? Number(tailorForm.holderUnitPrice) || 0 : 0;
+        extra.holderTotal = tailorTotals.holderTotal;
+        extra.endingPairs = pipesOn ? Number(tailorForm.endingPairs) || 0 : 0;
+        extra.endingUnitPrice = pipesOn ? Number(tailorForm.endingUnitPrice) || 0 : 0;
+        extra.endingTotal = tailorTotals.endingTotal;
+        extra.laborCost = 0;
+        if (tailorForm.materials) extra.materials = tailorForm.materials;
         if (tailorForm.deliveryDate) extra.deliveryDate = tailorForm.deliveryDate;
       }
 
@@ -629,6 +898,9 @@ export default function NewInstallmentPage() {
         planType: planType ?? "shop",
         ...extra,
       });
+      if (invoiceId) {
+        await linkInvoiceToInstallment(invoiceId, id);
+      }
       router.push(`/sales/installments/${id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save");
@@ -636,7 +908,36 @@ export default function NewInstallmentPage() {
     }
   };
 
-  const setTailor   = (k: keyof TailorForm, v: string)   => setTailorForm((p)   => ({ ...p, [k]: v }));
+  const setTailor = <K extends keyof TailorForm>(k: K, v: TailorForm[K]) => {
+    setTailorForm((prev) => {
+      const next = { ...prev, [k]: v };
+      if (k === "productType") {
+        if (v === "bedsheets") {
+          next.needsPipes = false;
+          next.pipeMeters = 0;
+          next.pipeUnitPrice = 0;
+          next.holderPairs = 0;
+          next.holderUnitPrice = 0;
+          next.endingPairs = 0;
+          next.endingUnitPrice = 0;
+          next.meters = 0;
+          if (!next.quantity) next.quantity = 1;
+        } else if (v === "curtains") {
+          next.bedsheetSize = "";
+          if (!next.meters) next.meters = 1;
+        }
+      }
+      if (k === "needsPipes" && v === false) {
+        next.pipeMeters = 0;
+        next.pipeUnitPrice = 0;
+        next.holderPairs = 0;
+        next.holderUnitPrice = 0;
+        next.endingPairs = 0;
+        next.endingUnitPrice = 0;
+      }
+      return next;
+    });
+  };
   const setCustomer = (k: keyof CustomerForm, v: string) => setCustomerForm((p) => ({ ...p, [k]: v }));
 
   return (
@@ -717,23 +1018,43 @@ export default function NewInstallmentPage() {
                 {planType === "tailor" && (
                   <>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Garment</span>
-                      <span className="font-semibold">{tailorForm.productType}</span>
+                      <span className="text-muted-foreground">Product</span>
+                      <span className="font-semibold">{productTypeLabel(tailorForm.productType)}</span>
                     </div>
+                    {tailorForm.productType === "bedsheets" && tailorForm.bedsheetSize && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Size</span>
+                        <span>{tailorForm.bedsheetSize} × {tailorForm.quantity || 1}</span>
+                      </div>
+                    )}
+                    {tailorForm.productType === "curtains" && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Fabric</span>
+                        <span>{tailorForm.meters} m — UGX {fmtUGX(tailorTotals.fabricTotal)}</span>
+                      </div>
+                    )}
+                    {tailorForm.needsPipes && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Pipes</span>
+                          <span className="tabular-nums">UGX {fmtUGX(tailorTotals.pipeTotal)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Holders</span>
+                          <span className="tabular-nums">{tailorForm.holderPairs} pair(s) — UGX {fmtUGX(tailorTotals.holderTotal)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Endings</span>
+                          <span className="tabular-nums">{tailorForm.endingPairs} pair(s) — UGX {fmtUGX(tailorTotals.endingTotal)}</span>
+                        </div>
+                      </>
+                    )}
                     {tailorForm.deliveryDate && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Delivery Date</span>
                         <span>{new Date(tailorForm.deliveryDate).toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" })}</span>
                       </div>
                     )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Material Cost</span>
-                      <span className="tabular-nums">UGX {fmtUGX(Number(tailorForm.materialCost) || 0)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Labour Cost</span>
-                      <span className="tabular-nums">UGX {fmtUGX(Number(tailorForm.laborCost) || 0)}</span>
-                    </div>
                   </>
                 )}
 

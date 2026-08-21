@@ -1,17 +1,31 @@
 import { ROUTE_PERMISSIONS } from "@/lib/rbac-seed";
+import { isDesignatedSuperAdminEmail } from "@/lib/bootstrap-admin";
 import { SUPER_ADMIN_ROLE } from "@/types";
 
-export function isSuperAdmin(roles: string[] | undefined): boolean {
-  if (!roles?.length) return false;
-  return roles.includes(SUPER_ADMIN_ROLE) || roles.includes("super_admin");
+function compactRoleId(roleId: string) {
+  return roleId.trim().toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+export function isSuperAdminRoleId(roleId: string | undefined | null): boolean {
+  if (!roleId) return false;
+  return compactRoleId(roleId) === "superadmin";
+}
+
+export function isSuperAdmin(
+  roles: string[] | undefined,
+  email?: string | null
+): boolean {
+  if (isDesignatedSuperAdminEmail(email)) return true;
+  return (roles ?? []).some(isSuperAdminRoleId);
 }
 
 export function hasPermission(
   effectivePermissions: string[] | undefined,
   roles: string[] | undefined,
-  permission: string
+  permission: string,
+  email?: string | null
 ): boolean {
-  if (isSuperAdmin(roles)) return true;
+  if (isSuperAdmin(roles, email)) return true;
   if (!effectivePermissions) return false;
   return effectivePermissions.includes(permission);
 }
@@ -20,6 +34,7 @@ export function hasRole(
   roles: string[] | undefined,
   roleId: string
 ): boolean {
+  if (isSuperAdmin(roles)) return true;
   return roles?.includes(roleId) ?? false;
 }
 
@@ -27,6 +42,7 @@ export function hasAnyRole(
   roles: string[] | undefined,
   roleIds: string[]
 ): boolean {
+  if (isSuperAdmin(roles)) return true;
   if (!roles?.length) return false;
   return roleIds.some((id) => roles.includes(id));
 }
@@ -35,6 +51,7 @@ export function hasAllRoles(
   roles: string[] | undefined,
   roleIds: string[]
 ): boolean {
+  if (isSuperAdmin(roles)) return true;
   if (!roles?.length) return false;
   return roleIds.every((id) => roles.includes(id));
 }
@@ -60,11 +77,13 @@ export function getRequiredPermissionForRoute(pathname: string): string | null {
 export function canAccessRoute(
   effectivePermissions: string[] | undefined,
   roles: string[] | undefined,
-  pathname: string
+  pathname: string,
+  email?: string | null
 ): boolean {
+  if (isSuperAdmin(roles, email)) return true;
   const required = getRequiredPermissionForRoute(pathname);
   if (!required) return true;
-  return hasPermission(effectivePermissions, roles, required);
+  return hasPermission(effectivePermissions, roles, required, email);
 }
 
 export function getUserDisplayName(user: {
@@ -86,3 +105,5 @@ export function getUserInitials(user: {
   const initials = `${first}${last}`.toUpperCase();
   return initials || user.email?.[0]?.toUpperCase() || "U";
 }
+
+export { SUPER_ADMIN_ROLE };

@@ -19,7 +19,7 @@ import {
   query,
 } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
-import { getUserDisplayName, isSuperAdmin } from "@/lib/auth-utils";
+import { getUserDisplayName, isSuperAdmin, isSuperAdminRoleId } from "@/lib/auth-utils";
 import { isDesignatedSuperAdminEmail } from "@/lib/bootstrap-admin";
 import {
   isLegacyUserDoc,
@@ -163,47 +163,28 @@ async function ensureUserProfile(authUser: User): Promise<UserProfile> {
 
 /** Ensure super admins always carry the full merged permission set */
 function applySuperAdminPermissions(profile: UserProfile): UserProfile {
-  if (!isSuperAdmin(profile.roles)) return profile;
+  if (!isSuperAdmin(profile.roles, profile.email)) return profile;
+  const roles = [
+    SUPER_ADMIN_ROLE,
+    ...profile.roles.filter((role) => !isSuperAdminRoleId(role)),
+  ];
   return {
     ...profile,
-    roles: profile.roles.includes(SUPER_ADMIN_ROLE)
-      ? profile.roles
-      : [SUPER_ADMIN_ROLE, ...profile.roles.filter((r) => r !== "super_admin")],
+    roles,
     effectivePermissions: ALL_PERMISSION_IDS,
+    active: true,
   };
 }
 
 /** Repair designated owner accounts and normalize super-admin permissions */
 async function finalizeUserProfile(profile: UserProfile): Promise<UserProfile> {
-  let result = profile;
+  const result = applySuperAdminPermissions(profile);
 
-  if (isDesignatedSuperAdminEmail(profile.email) && !isSuperAdmin(profile.roles)) {
-    result = {
-      ...result,
-      roles: [SUPER_ADMIN_ROLE],
-      effectivePermissions: ALL_PERMISSION_IDS,
-      active: true,
-    };
-
-    try {
-      await updateDoc(doc(getFirebaseDb(), "users", profile.uid), {
-        roles: result.roles,
-        effectivePermissions: result.effectivePermissions,
-        active: true,
-        updatedAt: serverTimestamp(),
-      });
-    } catch {
-      // Client session still gets full access if rules block the write
-    }
-  }
-
-  result = applySuperAdminPermissions(result);
-
-  if (isSuperAdmin(result.roles)) {
+  if (isSuperAdmin(result.roles, result.email)) {
     try {
       await syncSuperAdminRole();
       await updateDoc(doc(getFirebaseDb(), "users", profile.uid), {
-        roles: [SUPER_ADMIN_ROLE],
+        roles: result.roles,
         effectivePermissions: ALL_PERMISSION_IDS,
         active: true,
         updatedAt: serverTimestamp(),
@@ -252,14 +233,14 @@ export async function signIn(
 
   profile = await finalizeUserProfile(profile);
 
-  const effectivePermissions = isSuperAdmin(profile.roles)
+  const effectivePermissions = isSuperAdmin(profile.roles, profile.email)
     ? ALL_PERMISSION_IDS
     : await resolveEffectivePermissions(profile.roles);
 
   try {
     await updateDoc(doc(getFirebaseDb(), "users", user.uid), {
       lastLogin: serverTimestamp(),
-      ...(isSuperAdmin(profile.roles)
+      ...(isSuperAdmin(profile.roles, profile.email)
         ? { roles: [SUPER_ADMIN_ROLE], effectivePermissions: ALL_PERMISSION_IDS }
         : { effectivePermissions }),
       updatedAt: serverTimestamp(),
@@ -314,7 +295,7 @@ export async function loadUserSession(uid: string): Promise<UserProfile | null> 
   const normalized = await finalizeUserProfile(profile);
 
   try {
-    const resolved = isSuperAdmin(normalized.roles)
+    const resolved = isSuperAdmin(normalized.roles, normalized.email)
       ? ALL_PERMISSION_IDS
       : await resolveEffectivePermissions(normalized.roles);
     const merged = [...new Set([...normalized.effectivePermissions, ...resolved])];
@@ -393,7 +374,7 @@ export async function repairAndRefreshSession(): Promise<UserProfile | null> {
 
   profile = await finalizeUserProfile(profile);
 
-  const effectivePermissions = isSuperAdmin(profile.roles)
+  const effectivePermissions = isSuperAdmin(profile.roles, profile.email)
     ? ALL_PERMISSION_IDS
     : await resolveEffectivePermissions(profile.roles);
 
@@ -410,7 +391,9 @@ export async function refreshUserPermissions(
   const profile = await getUserProfile(uid);
   if (!profile) return null;
 
-  const effectivePermissions = await resolveEffectivePermissions(profile.roles);
+  const effectivePermissions = isSuperAdmin(profile.roles, profile.email)
+    ? ALL_PERMISSION_IDS
+    : await resolveEffectivePermissions(profile.roles);
   await updateDoc(doc(getFirebaseDb(), "users", uid), {
     effectivePermissions,
     updatedAt: serverTimestamp(),

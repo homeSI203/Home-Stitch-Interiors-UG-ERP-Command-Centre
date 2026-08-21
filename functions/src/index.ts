@@ -17,14 +17,20 @@ async function getCallerProfile(uid: string) {
   return snap.data();
 }
 
-function isSuperAdmin(roles: string[] = []) {
-  return roles.includes("superAdmin");
+const SUPER_ADMIN_EMAILS = [
+  "homestitchinteriorsug@gmail.com",
+  "elisasaychitoleko2@gmail.com",
+];
+
+function isSuperAdmin(roles: string[] = [], email?: string) {
+  if (email && SUPER_ADMIN_EMAILS.includes(email.trim().toLowerCase())) return true;
+  return roles.some((role) => String(role).toLowerCase().replace(/[\s_-]+/g, "") === "superadmin");
 }
 
 async function callerHasPermission(uid: string, permission: string) {
   const profile = await getCallerProfile(uid);
   if (!profile || profile.active === false) return false;
-  if (isSuperAdmin(profile.roles ?? [])) return true;
+  if (isSuperAdmin(profile.roles ?? [], profile.email)) return true;
   return (profile.effectivePermissions ?? []).includes(permission);
 }
 

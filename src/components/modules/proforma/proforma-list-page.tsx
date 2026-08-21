@@ -251,7 +251,7 @@ export function ProformaListPage() {
                           </Button>
                           <Button asChild variant="ghost" size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-brand-green hover:bg-brand-green/10">
-                            <Link href={`/proforma-invoices/${row.id}/pdf`} title="Preview"><Printer className="h-3.5 w-3.5" /></Link>
+                            <Link href={`/proforma-invoices/${row.id}/pdf`} title="Export PDF"><Printer className="h-3.5 w-3.5" /></Link>
                           </Button>
                         </div>
                       </td>

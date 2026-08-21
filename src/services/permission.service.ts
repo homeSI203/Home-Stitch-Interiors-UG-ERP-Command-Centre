@@ -188,4 +188,20 @@ export async function syncSuperAdminRole(): Promise<void> {
     },
     { merge: true }
   );
+
+  // Add any newly seeded permissions onto existing system roles without removing extras.
+  for (const role of SYSTEM_ROLES) {
+    if (role.id === SUPER_ADMIN_ROLE) continue;
+    const ref = doc(db, "rolePermissions", role.id);
+    const snap = await getDoc(ref);
+    const existing = snap.exists()
+      ? ((snap.data().permissions as string[] | undefined) ?? [])
+      : [];
+    const merged = [...new Set([...existing, ...role.permissions])];
+    await setDoc(
+      ref,
+      { roleId: role.id, permissions: merged, updatedAt: now },
+      { merge: true }
+    );
+  }
 }

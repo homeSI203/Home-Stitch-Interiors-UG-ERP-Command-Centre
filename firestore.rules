@@ -31,9 +31,13 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      return isActiveUser() && (
-        'superAdmin' in getUserData().roles ||
-        'super_admin' in getUserData().roles
+      return isDesignatedOwner() || (
+        isActiveUser() && (
+          'superAdmin' in getUserData().roles ||
+          'super_admin' in getUserData().roles ||
+          'SuperAdmin' in getUserData().roles ||
+          'Super Admin' in getUserData().roles
+        )
       );
     }
 
@@ -285,6 +289,13 @@ service cloud.firestore {
     match /notifications/{docId} {
       allow read: if canViewNotifications();
       allow create, update, delete: if canViewNotifications();
+    }
+
+    match /posPrintJobs/{docId} {
+      allow read: if hasPerm('create_sales') || hasPerm('print_receipts');
+      allow create: if hasPerm('create_sales') || hasPerm('print_receipts');
+      allow update: if hasPerm('create_sales') || hasPerm('print_receipts');
+      allow delete: if false;
     }
   }
 }

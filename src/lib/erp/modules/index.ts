@@ -353,7 +353,7 @@ export const receiptModule: EntityConfig = {
   managePermission: "manage_receipts",
   searchableFields: ["receiptNumber", "customerName"],
   fields: [
-    { key: "receiptNumber", label: "Receipt Number", type: "text", required: true },
+    { key: "receiptNumber", label: "Receipt Number", type: "text", required: true, autoGenerate: "RCT" },
     { key: "customerName", label: "Customer", type: "text" },
     { key: "amount", label: "Amount", type: "currency", required: true },
     {
@@ -364,6 +364,8 @@ export const receiptModule: EntityConfig = {
         { label: "Cash", value: "cash" },
         { label: "Mobile Money", value: "mobile_money" },
         { label: "Bank Transfer", value: "bank" },
+        { label: "Card", value: "card" },
+        { label: "Installment", value: "installment" },
       ],
     },
     { key: "notes", label: "Notes", type: "textarea", colSpan: 2 },
@@ -432,13 +434,30 @@ export const customOrderModule: EntityConfig = {
     { key: "customerName", label: "Customer", type: "text", required: true },
     { key: "customerPhone", label: "Phone", type: "phone" },
     { key: "customerAddress", label: "Address", type: "text" },
-    { key: "productType", label: "Product Type", type: "text", required: true },
+    { key: "productType", label: "Product Type", type: "select", required: true, options: [
+      { label: "Bedsheets", value: "Bedsheets" },
+      { label: "Curtains", value: "Curtains" },
+    ] },
+    { key: "bedsheetSize", label: "Bedsheet Size", type: "select", options: [
+      { label: "4*6", value: "4*6" },
+      { label: "5*6", value: "5*6" },
+      { label: "6*6", value: "6*6" },
+      { label: "King Size", value: "King Size" },
+    ] },
+    { key: "quantity", label: "Quantity", type: "number", defaultValue: 1 },
     { key: "description", label: "Description", type: "textarea", colSpan: 2 },
-    { key: "measurements", label: "Measurements", type: "textarea", colSpan: 2 },
     { key: "materials", label: "Materials", type: "textarea", colSpan: 2 },
-    { key: "laborCost", label: "Labor Cost", type: "currency" },
-    { key: "materialCost", label: "Material Cost (per meter)", type: "currency" },
-    { key: "meters", label: "Meters", type: "number", defaultValue: 1 },
+    { key: "materialCost", label: "Unit / Fabric Price", type: "currency" },
+    { key: "meters", label: "Fabric Meters", type: "number" },
+    { key: "pipeMeters", label: "Pipe Meters", type: "number" },
+    { key: "pipeUnitPrice", label: "Price per Pipe Meter", type: "currency" },
+    { key: "pipeTotal", label: "Pipes Total", type: "currency" },
+    { key: "holderPairs", label: "Curtain Holders (pairs)", type: "number" },
+    { key: "holderUnitPrice", label: "Price per Holder Pair", type: "currency" },
+    { key: "holderTotal", label: "Holders Total", type: "currency" },
+    { key: "endingPairs", label: "Pipe Endings (pairs)", type: "number" },
+    { key: "endingUnitPrice", label: "Price per Ending Pair", type: "currency" },
+    { key: "endingTotal", label: "Endings Total", type: "currency" },
     { key: "total", label: "Total", type: "currency", required: true, readOnly: true },
     { key: "deliveryDate", label: "Delivery Date", type: "date" },
     {
@@ -460,6 +479,7 @@ export const customOrderModule: EntityConfig = {
     { key: "orderNumber", label: "Order #" },
     { key: "customerName", label: "Customer" },
     { key: "productType", label: "Type" },
+    { key: "bedsheetSize", label: "Size" },
     { key: "meters", label: "Meters", format: "number" },
     { key: "total", label: "Total", format: "currency" },
     { key: "productionStage", label: "Stage", format: "badge" },
@@ -467,6 +487,14 @@ export const customOrderModule: EntityConfig = {
   trackingBoardPath: "/custom-orders/production-board",
   rowAction: "print",
   printPath: "pdf",
+  listRowActions: [
+    {
+      label: "Confirm",
+      href: (id) => `/custom-orders/${id}/confirm`,
+      permission: "manage_custom_orders",
+      showWhen: (row) => !row.invoiceId,
+    },
+  ],
 };
 
 export const inventoryMovementModule: EntityConfig = {

@@ -8,6 +8,7 @@ import { PermissionGate } from "@/components/auth/permission-gate";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader, formatCellValue } from "@/components/erp/page-header";
+import { BackToPreviousPage } from "@/components/erp/back-to-previous-page";
 import type { EntityConfig } from "@/lib/erp/entity-config";
 import { getEntity } from "@/services/entity.service";
 import { Loader2 } from "lucide-react";
@@ -19,7 +20,7 @@ export function EntityDetailPage({
 }: {
   config: EntityConfig;
   id: string;
-  extraActions?: React.ReactNode;
+  extraActions?: React.ReactNode | ((data: Record<string, unknown> | null) => React.ReactNode);
 }) {
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,6 +31,8 @@ export function EntityDetailPage({
       setLoading(false);
     });
   }, [config.collection, id]);
+
+  const actions = typeof extraActions === "function" ? extraActions(data) : extraActions;
 
   const title = `${config.label} Details`;
 
@@ -53,7 +56,7 @@ export function EntityDetailPage({
                 </Link>
               </Button>
             </PermissionGate>
-            {extraActions}
+            {actions}
           </>
         }
       />
@@ -68,7 +71,10 @@ export function EntityDetailPage({
               <Loader2 className="h-6 w-6 animate-spin" />
             </div>
           ) : !data ? (
-            <p className="text-muted-foreground">Record not found.</p>
+            <div className="flex flex-col items-start gap-3 py-4">
+              <p className="text-muted-foreground">Record not found.</p>
+              <BackToPreviousPage />
+            </div>
           ) : (
             <dl className="grid gap-4 sm:grid-cols-2">
               {config.fields.map((field) => (

@@ -97,7 +97,7 @@ function SectionHeader({ title, action }: { title: string; action?: { label: str
 export default function DashboardPage() {
   const { data: stats, isLoading } = useDashboardStats();
   const { user } = useAuth();
-  const userIsSuperAdmin = checkSuperAdmin(user?.roles);
+  const userIsSuperAdmin = checkSuperAdmin(user?.roles, user?.email);
   const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
   const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
   const [loadingExtra, setLoadingExtra] = useState(true);

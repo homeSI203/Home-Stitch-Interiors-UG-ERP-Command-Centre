@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Loader2, Printer } from "lucide-react";
+import { Plus, Trash2, Loader2, FileDown } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -519,8 +519,8 @@ export function DocumentForm({
             </Button>
             <Button variant="outline" onClick={handlePrint} disabled={saving || loading}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <Printer className="mr-2 h-4 w-4" />
-              Print
+              <FileDown className="mr-2 h-4 w-4" />
+              Export PDF
             </Button>
             <Button variant="gold" onClick={handleSave} disabled={saving || loading}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -788,8 +788,8 @@ export function DocumentForm({
             </Button>
             <Button variant="outline" onClick={handlePrint} disabled={saving} className="min-w-[140px]">
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <Printer className="mr-2 h-4 w-4" />
-              Print
+              <FileDown className="mr-2 h-4 w-4" />
+              Export PDF
             </Button>
             <Button variant="outline" onClick={() => router.back()} disabled={saving}>
               Cancel
