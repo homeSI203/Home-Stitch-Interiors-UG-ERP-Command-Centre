@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { FileDown, Printer, ArrowLeft } from "lucide-react";
-import { A4_SHEET_PRINT_STYLES, printHtmlDocument, useAutoPrint } from "@/lib/print-receipt";
+import { A4_SHEET_PRINT_STYLES, printHtmlDocument, saveHtmlAsPdf, useAutoPrint } from "@/lib/print-receipt";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { getEntity } from "@/services/entity.service";
@@ -564,6 +564,19 @@ export function DocumentSheetPage({ config }: { config: DocumentSheetConfig }) {
     run();
   }, [config.docLabel, docNumber]);
 
+  const handleSavePdf = useCallback(() => {
+    const el = document.getElementById("doc-print");
+    if (!el) return;
+    void saveHtmlAsPdf({
+      html: el.outerHTML,
+      title: `${config.docLabel} ${docNumber}`,
+      styles: `${A4_SHEET_PRINT_STYLES}
+        #doc-print { position: relative; min-height: 995px; }
+      `,
+      fileName: `${config.docLabel}-${docNumber}`,
+    });
+  }, [config.docLabel, docNumber]);
+
   useAutoPrint(!loading && !!data, handlePrint);
 
   return (
@@ -583,8 +596,8 @@ export function DocumentSheetPage({ config }: { config: DocumentSheetConfig }) {
           <Button variant="outline" onClick={handlePrint} disabled={loading || !data}>
             <Printer className="mr-2 h-4 w-4" /> Print
           </Button>
-          <Button variant="gold" onClick={handlePrint} disabled={loading || !data}>
-            <FileDown className="mr-2 h-4 w-4" /> Export PDF
+          <Button variant="gold" onClick={handleSavePdf} disabled={loading || !data}>
+            <FileDown className="mr-2 h-4 w-4" /> Save PDF
           </Button>
         </div>
       </div>

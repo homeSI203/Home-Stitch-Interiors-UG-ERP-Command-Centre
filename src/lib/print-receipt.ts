@@ -136,6 +136,37 @@ export function printHtmlDocument(opts: {
   );
 }
 
+/** Save as PDF (desktop: file dialog; browser: print dialog for “Save as PDF”). */
+export async function saveHtmlAsPdf(opts: {
+  html: string;
+  title: string;
+  styles: string;
+  fileName?: string;
+}) {
+  const origin = window.location.origin;
+  const html = opts.html.replace(/src="(\/[^"]+)"/g, `src="${origin}$1"`);
+  const title = opts.title.replace(/[<>]/g, "");
+  const fileName = (opts.fileName || title).replace(/[<>:"/\\|?*]/g, "-");
+
+  const bridge = window.homeStitchDesktop;
+  if (bridge?.savePdf) {
+    return bridge.savePdf({
+      html,
+      title,
+      styles: opts.styles,
+      fileName,
+    });
+  }
+
+  // Browser / non-desktop: open the print dialog so the user can choose Save as PDF.
+  printHtmlDocument({
+    html: opts.html,
+    title: `Save PDF — ${title}`,
+    styles: opts.styles,
+  });
+  return { saved: false };
+}
+
 export function printReceiptHtml(opts: {
   html: string;
   title: string;

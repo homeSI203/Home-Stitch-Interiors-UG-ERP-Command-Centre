@@ -36,10 +36,10 @@ export function CustomOrderDetailPage() {
               Print
             </Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild variant="gold">
             <Link href={`/custom-orders/${id}/pdf`}>
               <FileDown className="mr-2 h-4 w-4" />
-              Export PDF
+              Save PDF
             </Link>
           </Button>
           <Button asChild variant="outline">

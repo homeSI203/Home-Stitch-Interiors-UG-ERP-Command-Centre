@@ -7,10 +7,30 @@ export type DesktopPrinter = {
   port: string;
 };
 
+export type DesktopSavePdfResult = {
+  saved: boolean;
+  filePath?: string;
+};
+
+export type DesktopUpdateStatus = {
+  state: "checking" | "available" | "none" | "downloading" | "ready" | "error" | "dev";
+  version?: string;
+  percent?: number;
+  message?: string;
+};
+
 type DesktopBridge = {
   isDesktop: true;
   listPrinters: () => Promise<DesktopPrinter[]>;
   printRaw: (payloadBase64: string, printerName: string) => Promise<void>;
+  savePdf?: (payload: {
+    html: string;
+    title: string;
+    styles: string;
+    fileName?: string;
+  }) => Promise<DesktopSavePdfResult>;
+  checkForUpdates?: () => Promise<DesktopUpdateStatus>;
+  onUpdateStatus?: (callback: (status: DesktopUpdateStatus) => void) => () => void;
 };
 
 declare global {

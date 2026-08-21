@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "next lint",
     "desktop": "yarn --cwd desktop start",
-    "dist:win": "next build && node scripts/prepare-standalone.mjs && yarn --cwd desktop dist"
+    "dist:win": "next build && node scripts/prepare-standalone.mjs && yarn --cwd desktop dist",
+    "dist:win:publish": "next build && node scripts/prepare-standalone.mjs && yarn --cwd desktop dist --publish always"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

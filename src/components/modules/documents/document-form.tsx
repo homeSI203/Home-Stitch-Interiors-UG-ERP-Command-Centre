@@ -520,7 +520,7 @@ export function DocumentForm({
             <Button variant="outline" onClick={handlePrint} disabled={saving || loading}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <FileDown className="mr-2 h-4 w-4" />
-              Export PDF
+              Save PDF
             </Button>
             <Button variant="gold" onClick={handleSave} disabled={saving || loading}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -789,7 +789,7 @@ export function DocumentForm({
             <Button variant="outline" onClick={handlePrint} disabled={saving} className="min-w-[140px]">
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <FileDown className="mr-2 h-4 w-4" />
-              Export PDF
+              Save PDF
             </Button>
             <Button variant="outline" onClick={() => router.back()} disabled={saving}>
               Cancel

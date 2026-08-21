@@ -25,7 +25,7 @@ export default function Page() {
           <Button asChild variant="gold">
             <Link href={`/proforma-invoices/${id}/pdf`}>
               <FileDown className="mr-2 h-4 w-4" />
-              Export PDF
+              Save PDF
             </Link>
           </Button>
         </>

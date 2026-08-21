@@ -1,15 +1,75 @@
-const { app, BrowserWindow, ipcMain, Menu, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, shell } = require("electron");
 const fs = require("fs");
 const http = require("http");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { autoUpdater } = require("electron-updater");
 
 const SKIP_PRINTERS = /print to pdf|xps document|onenote|fax|microsoft ipp/i;
 const PACKAGED_PORT = 47321;
 
 let mainWindow = null;
 let nextProcess = null;
+let updateReady = false;
+
+function emitUpdateStatus(status) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("app:updateStatus", status);
+  }
+}
+
+function setupAutoUpdates() {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("checking-for-update", () => {
+    emitUpdateStatus({ state: "checking" });
+  });
+  autoUpdater.on("update-available", (info) => {
+    emitUpdateStatus({ state: "available", version: info.version });
+  });
+  autoUpdater.on("update-not-available", () => {
+    emitUpdateStatus({ state: "none" });
+  });
+  autoUpdater.on("download-progress", (progress) => {
+    emitUpdateStatus({
+      state: "downloading",
+      percent: Math.round(progress.percent || 0),
+    });
+  });
+  autoUpdater.on("update-downloaded", async (info) => {
+    updateReady = true;
+    emitUpdateStatus({ state: "ready", version: info.version });
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "Update ready",
+      message: `Home Stitch ERP ${info.version} has been downloaded.`,
+      detail: "Restart now to install the update, or continue working and it will install when you quit.",
+      buttons: ["Restart now", "Later"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (response === 0) {
+      autoUpdater.quitAndInstall(false, true);
+    }
+  });
+  autoUpdater.on("error", (err) => {
+    emitUpdateStatus({
+      state: "error",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  });
+
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(() => {
+      /* offline or no release yet */
+    });
+  }, 8000);
+}
 
 function appIcon() {
   const packaged = path.join(process.resourcesPath, "icon.png");
@@ -214,6 +274,57 @@ function printRaw(payloadBase64, printerName) {
   });
 }
 
+async function savePdfDocument(payload) {
+  const html = String(payload?.html || "");
+  const title = String(payload?.title || "Document").replace(/[<>:"/\\|?*\x00-\x1f]/g, "-");
+  const styles = String(payload?.styles || "");
+  const defaultName = String(payload?.fileName || title || "document").replace(/\.pdf$/i, "");
+
+  const documentHtml = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${title.replace(/[<>]/g, "")}</title>
+    <style>${styles}</style>
+  </head>
+  <body>${html}</body>
+</html>`;
+
+  const pdfWindow = new BrowserWindow({
+    show: false,
+    width: 794,
+    height: 1123,
+    webPreferences: {
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  try {
+    await pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(documentHtml)}`);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const pdfBuffer = await pdfWindow.webContents.printToPDF({
+      printBackground: true,
+      pageSize: "A4",
+      margins: { marginType: "default" },
+    });
+
+    const result = await dialog.showSaveDialog(mainWindow || pdfWindow, {
+      title: "Save PDF",
+      defaultPath: path.join(app.getPath("documents"), `${defaultName}.pdf`),
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    if (result.canceled || !result.filePath) {
+      return { saved: false };
+    }
+    fs.writeFileSync(result.filePath, pdfBuffer);
+    return { saved: true, filePath: result.filePath };
+  } finally {
+    if (!pdfWindow.isDestroyed()) pdfWindow.destroy();
+  }
+}
+
 function stopNext() {
   if (!nextProcess) return;
   try {
@@ -234,7 +345,22 @@ app.setAppUserModelId("ug.homestitch.erp");
 app.whenReady().then(async () => {
   ipcMain.handle("pos:listPrinters", () => listPrinters());
   ipcMain.handle("pos:printRaw", (_event, payloadBase64, printerName) => printRaw(payloadBase64, printerName));
+  ipcMain.handle("docs:savePdf", (_event, payload) => savePdfDocument(payload));
+  ipcMain.handle("app:checkForUpdates", async () => {
+    if (!app.isPackaged) return { state: "dev" };
+    if (updateReady) return { state: "ready" };
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      return { state: "checking", version: result?.updateInfo?.version };
+    } catch (err) {
+      return {
+        state: "error",
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
+  });
   createWindow();
+  setupAutoUpdates();
   await mainWindow.loadFile(path.join(__dirname, "loading.html"));
   try {
     const url = app.isPackaged ? await startPackagedServer() : await startDevServer();

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, FileDown, Loader2, Printer } from "lucide-react";
-import { A4_SHEET_PRINT_STYLES, printHtmlDocument, useAutoPrint } from "@/lib/print-receipt";
+import { A4_SHEET_PRINT_STYLES, printHtmlDocument, saveHtmlAsPdf, useAutoPrint } from "@/lib/print-receipt";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { BackToPreviousPage } from "@/components/erp/back-to-previous-page";
@@ -520,6 +520,17 @@ export function CustomOrderPdfPage() {
     });
   }, [orderNumber]);
 
+  const handleSavePdf = useCallback(() => {
+    const el = document.getElementById("custom-order-print");
+    if (!el) return;
+    void saveHtmlAsPdf({
+      html: el.innerHTML,
+      title: `Custom Order ${orderNumber}`,
+      styles: A4_SHEET_PRINT_STYLES,
+      fileName: `Custom-Order-${orderNumber}`,
+    });
+  }, [orderNumber]);
+
   useAutoPrint(!loading && !!data, handlePrint);
 
   return (
@@ -540,9 +551,9 @@ export function CustomOrderPdfPage() {
             <Printer className="mr-2 h-4 w-4" />
             Print
           </Button>
-          <Button variant="gold" onClick={handlePrint} disabled={loading}>
+          <Button variant="gold" onClick={handleSavePdf} disabled={loading}>
             <FileDown className="mr-2 h-4 w-4" />
-            Export PDF
+            Save PDF
           </Button>
         </div>
       </div>

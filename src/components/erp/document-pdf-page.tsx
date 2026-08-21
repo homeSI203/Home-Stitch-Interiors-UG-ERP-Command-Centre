@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { FileDown, Printer } from "lucide-react";
-import { A4_SHEET_PRINT_STYLES, printHtmlDocument, useAutoPrint } from "@/lib/print-receipt";
+import { A4_SHEET_PRINT_STYLES, printHtmlDocument, saveHtmlAsPdf, useAutoPrint } from "@/lib/print-receipt";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -66,6 +66,18 @@ export function DocumentPdfPage({
       styles: A4_SHEET_PRINT_STYLES,
     });
   }, [docType, docNumber]);
+
+  const handleSavePdf = useCallback(() => {
+    const el = document.getElementById("document-print");
+    if (!el) return;
+    void saveHtmlAsPdf({
+      html: el.innerHTML,
+      title: `${DOC_LABELS[docType]} ${docNumber}`,
+      styles: A4_SHEET_PRINT_STYLES,
+      fileName: `${DOC_LABELS[docType]}-${docNumber}`,
+    });
+  }, [docType, docNumber]);
+
   useAutoPrint(!loading && !!data, handlePrint);
 
   return (
@@ -78,9 +90,9 @@ export function DocumentPdfPage({
               <Printer className="mr-2 h-4 w-4" />
               Print
             </Button>
-            <Button variant="gold" onClick={handlePrint}>
+            <Button variant="gold" onClick={handleSavePdf}>
               <FileDown className="mr-2 h-4 w-4" />
-              Export PDF
+              Save PDF
             </Button>
             <Button asChild variant="outline">
               <Link href={`${config.basePath}/${id}`}>View Details</Link>

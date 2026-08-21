@@ -264,7 +264,7 @@ export function EntityListPage({ config }: { config: EntityConfig }) {
                         {config.rowAction === "print" ? (
                           <Button asChild variant="ghost" size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-brand-green hover:bg-brand-green/10"
-                            title="Export PDF">
+                            title="Save PDF">
                             <Link href={
                               config.printHref
                                 ? config.printHref(row)
