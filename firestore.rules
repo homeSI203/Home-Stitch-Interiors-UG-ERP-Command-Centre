@@ -146,13 +146,18 @@ service cloud.firestore {
     }
 
     match /settings/{docId} {
-      allow read: if hasPerm('view_settings') || isSuperAdmin();
+      // Company letterhead is needed on PDFs for every role that can view documents.
+      allow read: if (docId == "company" && isActiveUser())
+        || hasPerm('view_settings')
+        || isSuperAdmin();
       allow write: if hasPerm('manage_settings') || isSuperAdmin();
     }
 
     match /products/{docId} {
-      allow read: if hasPerm('view_inventory');
-      allow write: if hasPerm('manage_inventory');
+      allow read: if hasPerm('view_inventory') || hasPerm('create_sales');
+      allow create, delete: if hasPerm('manage_inventory');
+      // POS cashiers reduce quantity when a sale completes
+      allow update: if hasPerm('manage_inventory') || hasPerm('create_sales');
     }
 
     match /categories/{docId} {
@@ -206,13 +211,17 @@ service cloud.firestore {
     }
 
     match /invoices/{docId} {
-      allow read: if hasPerm('view_invoices');
-      allow write: if hasPerm('manage_invoices');
+      allow read: if hasPerm('view_invoices') || hasPerm('create_sales');
+      allow create, delete: if hasPerm('manage_invoices');
+      // POS cashiers mark invoices paid when collecting cash for a confirmed order
+      allow update: if hasPerm('manage_invoices') || hasPerm('create_sales');
     }
 
     match /receipts/{docId} {
-      allow read: if hasPerm('view_receipts');
-      allow write: if hasPerm('manage_receipts');
+      allow read: if hasPerm('view_receipts') || hasPerm('create_sales');
+      // POS creates a receipt on every completed sale
+      allow create: if hasPerm('manage_receipts') || hasPerm('create_sales');
+      allow update, delete: if hasPerm('manage_receipts');
     }
 
     match /expenses/{docId} {
@@ -252,13 +261,16 @@ service cloud.firestore {
     }
 
     match /inventoryMovements/{docId} {
-      allow read: if hasPerm('view_inventory');
-      allow write: if hasPerm('adjust_stock');
+      allow read: if hasPerm('view_inventory') || hasPerm('create_sales');
+      allow create: if hasPerm('adjust_stock') || hasPerm('create_sales');
+      allow update, delete: if hasPerm('adjust_stock') || hasPerm('manage_inventory');
     }
 
     match /customOrders/{docId} {
-      allow read: if hasPerm('view_custom_orders');
-      allow write: if hasPerm('manage_custom_orders');
+      allow read: if hasPerm('view_custom_orders') || hasPerm('create_sales');
+      allow create, delete: if hasPerm('manage_custom_orders');
+      // POS payment updates custom-order paymentStatus after invoice cash sale
+      allow update: if hasPerm('manage_custom_orders') || hasPerm('create_sales');
     }
 
     match /installments/{docId} {

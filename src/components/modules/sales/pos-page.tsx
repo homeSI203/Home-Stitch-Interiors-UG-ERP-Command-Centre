@@ -18,6 +18,7 @@ import {
 import { cn, formatCurrency, formatTime12h } from "@/lib/utils";
 import { createEntity, getEntity, listEntities } from "@/services/entity.service";
 import { markInvoicePaid } from "@/services/custom-order-invoice.service";
+import { deductStockForSale } from "@/services/stock.service";
 import { getCompanyProfile } from "@/services/company.service";
 import {
   createInstallmentPlan,
@@ -844,6 +845,11 @@ export function PosPage() {
     setSaving(true);
 
     const saleNumber = `SALE-${Date.now()}`;
+    const cartSnapshot = cart.map((i) => ({
+      productId: i.productId,
+      name: i.name,
+      qty: i.qty,
+    }));
     const items = cart.map((i) => ({
       productId: i.productId,
       description: i.name,
@@ -885,12 +891,24 @@ export function PosPage() {
         amount: grandTotal,
         paymentMethod: chosenMethod,
       });
+      await deductStockForSale(cartSnapshot, saleNumber);
+      setProducts((prev) =>
+        prev.map((p) => {
+          const sold = cartSnapshot.find((c) => c.productId === p.id);
+          if (!sold) return p;
+          return { ...p, quantity: Math.max(0, p.quantity - sold.qty) };
+        })
+      );
       if (linkedInvoiceId.current) {
         await markInvoicePaid(linkedInvoiceId.current, { saleId: id });
         linkedInvoiceId.current = null;
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Receipt printed, but the sale failed to save. Retry from Sales.");
+      const raw = err instanceof Error ? err.message : String(err);
+      const text = /permission|insufficient/i.test(raw)
+        ? "Sale may have printed, but saving failed: this role cannot write receipts/stock. Deploy updated Firestore rules."
+        : `Receipt printed, but the sale failed to save: ${raw}`;
+      alert(text);
     }
   }, [cart, customerName, subtotal, taxTotal, grandTotal, paymentMethod, resetSaleSession, printPosReceipt]);
 

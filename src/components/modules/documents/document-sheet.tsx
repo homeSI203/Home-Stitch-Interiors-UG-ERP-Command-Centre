@@ -534,14 +534,26 @@ export function DocumentSheetPage({ config }: { config: DocumentSheetConfig }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      getEntity<Record<string, unknown>>(config.collection, id),
-      getCompanyProfile(),
-    ]).then(([doc, co]) => {
-      setData(doc);
-      setCompany(co);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    let cancelled = false;
+    (async () => {
+      try {
+        const [doc, co] = await Promise.all([
+          getEntity<Record<string, unknown>>(config.collection, id),
+          getCompanyProfile(),
+        ]);
+        if (cancelled) return;
+        setData(doc);
+        setCompany(co);
+      } catch {
+        if (cancelled) return;
+        setData(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [config.collection, id]);
 
   const docNumber = data ? String(data[config.docNumberField] ?? id) : id;
@@ -607,13 +619,20 @@ export function DocumentSheetPage({ config }: { config: DocumentSheetConfig }) {
           <Loader2 className="h-8 w-8 animate-spin text-brand-gold" />
           <p className="text-sm text-muted-foreground">Loading document…</p>
         </div>
+      ) : !data ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <p className="text-muted-foreground">Document not found or you do not have permission to view it.</p>
+          <Button asChild variant="outline">
+            <Link href={config.basePath}>Back to list</Link>
+          </Button>
+        </div>
       ) : (
         <div className="flex justify-center print:block">
           <div
             className="bg-white shadow-lg border border-border/40 print:shadow-none print:border-none"
             style={{ width: 794, minHeight: 1123, padding: "64px 60px" }}
           >
-            {data && <PrintSheet config={config} data={data} company={company} />}
+            <PrintSheet config={config} data={data} company={company} />
           </div>
         </div>
       )}

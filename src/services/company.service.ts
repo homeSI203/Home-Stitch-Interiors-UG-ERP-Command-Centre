@@ -24,43 +24,48 @@ const DEFAULT_PROFILE: Omit<CompanyProfile, "id" | "updatedAt"> = {
 };
 
 export async function getCompanyProfile(): Promise<CompanyProfile> {
-  const db = getFirebaseDb();
-  const ref = doc(db, "settings", "company");
-  const snap = await getDoc(ref);
+  try {
+    const db = getFirebaseDb();
+    const ref = doc(db, "settings", "company");
+    const snap = await getDoc(ref);
 
-  if (!snap.exists()) {
+    if (!snap.exists()) {
+      return { id: "company", ...DEFAULT_PROFILE, updatedAt: new Date() };
+    }
+
+    const data = snap.data();
+    return {
+      id: "company",
+      name: (data.name as string) ?? DEFAULT_PROFILE.name,
+      tagline: (data.tagline as string) ?? DEFAULT_PROFILE.tagline,
+      logoUrl: data.logoUrl as string | undefined,
+      email: (data.email as string) ?? DEFAULT_PROFILE.email,
+      phone: /700.?000.?000/.test(String(data.phone ?? ""))
+        ? DEFAULT_PROFILE.phone
+        : (data.phone as string) ?? DEFAULT_PROFILE.phone,
+      phoneSecondary: data.phoneSecondary as string | undefined,
+      address: (data.address as string) ?? DEFAULT_PROFILE.address,
+      taxId: data.taxId as string | undefined,
+      currency: (data.currency as string) ?? "UGX",
+      taxRate: Number(data.taxRate ?? 18),
+      bankName: data.bankName as string | undefined,
+      bankAccount: data.bankAccount as string | undefined,
+      bankAccountName: data.bankAccountName as string | undefined,
+      bankBranch: data.bankBranch as string | undefined,
+      mobileMoneyProvider: data.mobileMoneyProvider as string | undefined,
+      mobileMoneyNumber: data.mobileMoneyNumber as string | undefined,
+      mobileMoneyName: data.mobileMoneyName as string | undefined,
+      socialTiktok: data.socialTiktok as string | undefined,
+      socialFacebook: data.socialFacebook as string | undefined,
+      socialTwitter: data.socialTwitter as string | undefined,
+      socialInstagram: data.socialInstagram as string | undefined,
+      updatedAt:
+        (data.updatedAt as { toDate?: () => Date })?.toDate?.() ?? new Date(),
+    };
+  } catch {
+    // Viewers and other roles may lack view_settings — still show letterhead defaults.
     return { id: "company", ...DEFAULT_PROFILE, updatedAt: new Date() };
   }
-
-  const data = snap.data();
-  return {
-    id: "company",
-    name: (data.name as string) ?? DEFAULT_PROFILE.name,
-    tagline: (data.tagline as string) ?? DEFAULT_PROFILE.tagline,
-    logoUrl: data.logoUrl as string | undefined,
-    email: (data.email as string) ?? DEFAULT_PROFILE.email,
-    phone: /700.?000.?000/.test(String(data.phone ?? ""))
-      ? DEFAULT_PROFILE.phone
-      : (data.phone as string) ?? DEFAULT_PROFILE.phone,
-    phoneSecondary: data.phoneSecondary as string | undefined,
-    address: (data.address as string) ?? DEFAULT_PROFILE.address,
-    taxId: data.taxId as string | undefined,
-    currency: (data.currency as string) ?? "UGX",
-    taxRate: Number(data.taxRate ?? 18),
-    bankName: data.bankName as string | undefined,
-    bankAccount: data.bankAccount as string | undefined,
-    bankAccountName: data.bankAccountName as string | undefined,
-    bankBranch: data.bankBranch as string | undefined,
-    mobileMoneyProvider: data.mobileMoneyProvider as string | undefined,
-    mobileMoneyNumber: data.mobileMoneyNumber as string | undefined,
-    mobileMoneyName: data.mobileMoneyName as string | undefined,
-    socialTiktok: data.socialTiktok as string | undefined,
-    socialFacebook: data.socialFacebook as string | undefined,
-    socialTwitter: data.socialTwitter as string | undefined,
-    socialInstagram: data.socialInstagram as string | undefined,
-    updatedAt:
-      (data.updatedAt as { toDate?: () => Date })?.toDate?.() ?? new Date(),
-  };
 }
 
 export async function saveCompanyProfile(
