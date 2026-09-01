@@ -9,6 +9,7 @@ import { isSuperAdmin as checkSuperAdmin } from "@/lib/auth-utils";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { listEntities } from "@/services/entity.service";
+import { MonthlySalesProfitChart } from "@/components/features/dashboard/charts";
 import {
   TrendingUp, TrendingDown, ShoppingCart, Users, Package,
   AlertTriangle, DollarSign, Activity,
@@ -141,12 +142,28 @@ export default function DashboardPage() {
     <DashboardLayout>
       <div className="space-y-6 pb-8">
 
-        {/* ── KPI Grid ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* ── Today + Monthly chart ── */}
+        <div className="grid lg:grid-cols-2 gap-5 items-stretch">
+          <div>
+            <SectionHeader title="Today" action={{ label: "Cash closing", href: "/cash-closing" }} />
+            <div className="grid grid-cols-2 gap-3">
+          <KpiCard
+            label="Daily Sales"
+            value={String(stats?.dailySales ?? "—")}
+            sub="transactions today"
+            icon={ShoppingCart}
+            accent="bg-violet-500"
+            href="/sales/history"
+            loading={isLoading}
+          />
           <KpiCard
             label="Total Revenue"
-            value={stats ? formatCurrency(stats.totalRevenue) : "—"}
-            sub="all time"
+            value={stats ? formatCurrency(stats.dailyRevenue) : "—"}
+            sub={
+              stats && stats.dailyDiscount > 0
+                ? `today · ${formatCurrency(stats.dailyDiscount)} discounts`
+                : "today (after price changes)"
+            }
             icon={DollarSign}
             accent="bg-emerald-500"
             href="/reports/sales"
@@ -154,20 +171,15 @@ export default function DashboardPage() {
           />
           <KpiCard
             label="Net Profit"
-            value={stats ? formatCurrency(stats.totalProfit ?? 0) : "—"}
-            sub="selling − cost per item sold"
-            icon={(stats?.totalProfit ?? 0) >= 0 ? TrendingUp : TrendingDown}
-            accent={(stats?.totalProfit ?? 0) >= 0 ? "bg-blue-500" : "bg-red-500"}
+            value={stats ? formatCurrency(stats.dailyProfit ?? 0) : "—"}
+            sub={
+              stats && stats.dailyDiscount > 0
+                ? "sold price − cost (incl. discounts)"
+                : "sold price − cost (today)"
+            }
+            icon={(stats?.dailyProfit ?? 0) >= 0 ? TrendingUp : TrendingDown}
+            accent={(stats?.dailyProfit ?? 0) >= 0 ? "bg-blue-500" : "bg-red-500"}
             href="/reports/profitability"
-            loading={isLoading}
-          />
-          <KpiCard
-            label="Total Sales"
-            value={String(stats?.totalSales ?? "—")}
-            sub="transactions"
-            icon={ShoppingCart}
-            accent="bg-violet-500"
-            href="/sales/history"
             loading={isLoading}
           />
           <KpiCard
@@ -179,6 +191,26 @@ export default function DashboardPage() {
             href="/inventory/reorder-alerts"
             loading={isLoading}
           />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col min-h-[320px]">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BarChart2 className="h-4 w-4 text-gray-500" />
+                <h2 className="font-bold text-gray-800 text-sm uppercase tracking-wider">Monthly Sales & Profit</h2>
+              </div>
+              <Link href="/reports/sales" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                Reports <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+            <div className="flex-1">
+              <MonthlySalesProfitChart
+                data={stats?.monthlyPerformance}
+                loading={isLoading}
+              />
+            </div>
+          </div>
         </div>
 
         {/* ── Quick Actions ── */}

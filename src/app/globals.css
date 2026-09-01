@@ -252,6 +252,12 @@
 .animate-fade-in   { animation: fade-in 0.35s ease-out both; }
 .animate-slide-in  { animation: slide-in-right 0.3s ease-out both; }
 
+/* 58mm thermal receipt — matches POS ESC/POS print width */
+.thermal-receipt {
+  width: 54mm;
+  max-width: 100%;
+}
+
 @media print {
   aside, header { display: none !important; }
   main { padding: 0 !important; overflow: visible !important; background: white !important; }

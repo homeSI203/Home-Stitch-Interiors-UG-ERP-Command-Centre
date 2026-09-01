@@ -9,6 +9,8 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Loader2, Printer, ArrowLeft, LayoutTemplate } from "lucide-react";
 import { printReceiptHtml, useAutoPrint } from "@/lib/print-receipt";
 import type { CompanyProfile } from "@/types/domain";
+import { THERMAL_RECEIPT_CLASSES } from "@/lib/thermal-receipt";
+import { ThermalReceiptHeader, ThermalReceiptInfo } from "@/components/receipts/thermal-receipt-header";
 import { BackToPreviousPage } from "@/components/erp/back-to-previous-page";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -18,6 +20,8 @@ export interface SaleItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  systemUnitPrice?: number;
+  lineDiscount?: number;
   taxRate?: number;
   total: number;
 }
@@ -29,6 +33,7 @@ export interface Sale {
   items: SaleItem[];
   subtotal: number;
   discount: number;
+  discountPercent?: number;
   tax: number;
   total: number;
   paymentMethod: string;
@@ -80,30 +85,21 @@ function getSaleDate(sale: Sale): Date {
 export function ThermalReceipt({ sale, company }: { sale: Sale; company: CompanyProfile }) {
   const date = getSaleDate(sale);
   return (
-    <div className="bg-white font-mono text-[11px] leading-snug w-[300px] mx-auto p-4 border border-dashed border-gray-300 shadow-sm">
-      {/* Header */}
-      <div className="text-center mb-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={companyLogo(company)}
-          alt={company.name}
-          className="h-12 w-auto object-contain mx-auto mb-2"
+    <div className={THERMAL_RECEIPT_CLASSES}>
+      <ThermalReceiptHeader company={company}>
+        <ThermalReceiptInfo
+          title="RECEIPT"
+          reference={sale.saleNumber}
+          dateLine={`${date.toLocaleDateString("en-UG")} ${formatTime12h(date)}`}
+          rows={[
+            { label: "Customer", value: sale.customerName || "Walk-in" },
+            {
+              label: "Payment",
+              value: PAYMENT_LABELS[sale.paymentMethod] ?? sale.paymentMethod,
+            },
+          ]}
         />
-        <p className="font-bold text-[13px] tracking-wide">{company.name}</p>
-        <p className="text-gray-500 text-[8px] leading-tight">{company.tagline}</p>
-        <p className="text-gray-500 text-[8px] leading-tight">{company.address}</p>
-        <p className="text-gray-500 text-[8px] leading-tight">{companyPhones(company)}</p>
-        <div className="border-t border-dashed border-gray-400 my-2" />
-        <p className="font-semibold text-[12px]">RECEIPT</p>
-        <p className="text-gray-500">{sale.saleNumber}</p>
-        <p className="text-gray-500">{date.toLocaleDateString("en-UG")} {formatTime12h(date)}</p>
-      </div>
-
-      {/* Customer */}
-      <div className="mb-2 border-t border-dashed border-gray-400 pt-2">
-        <p>Customer: <span className="font-semibold">{sale.customerName || "Walk-in"}</span></p>
-        <p>Payment: <span className="font-semibold">{PAYMENT_LABELS[sale.paymentMethod] ?? sale.paymentMethod}</span></p>
-      </div>
+      </ThermalReceiptHeader>
 
       {/* Items */}
       <div className="border-t border-dashed border-gray-400 pt-2 mb-2">
@@ -132,12 +128,20 @@ export function ThermalReceipt({ sale, company }: { sale: Sale; company: Company
         </div>
         {sale.discount > 0 && (
           <div className="flex justify-between text-green-700">
-            <span>Discount</span><span>-{formatCurrency(sale.discount)}</span>
+            <span>
+              Discount
+              {sale.discountPercent != null && sale.discountPercent > 0
+                ? ` (${sale.discountPercent.toFixed(1)}%)`
+                : ""}
+            </span>
+            <span>-{formatCurrency(sale.discount)}</span>
           </div>
         )}
-        <div className="flex justify-between">
-          <span>Tax</span><span>{formatCurrency(sale.tax)}</span>
-        </div>
+        {sale.tax > 0 && (
+          <div className="flex justify-between">
+            <span>Tax</span><span>{formatCurrency(sale.tax)}</span>
+          </div>
+        )}
         <div className="flex justify-between font-bold text-[13px] border-t border-dashed border-gray-400 pt-1 mt-1">
           <span>TOTAL</span><span>{formatCurrency(sale.total)}</span>
         </div>
@@ -246,9 +250,11 @@ function A4Receipt({ sale, company }: { sale: Sale; company: CompanyProfile }) {
               <span>Discount</span><span>-{formatCurrency(sale.discount)}</span>
             </div>
           )}
-          <div className="flex justify-between text-gray-600">
-            <span>Tax</span><span>{formatCurrency(sale.tax)}</span>
-          </div>
+          {sale.tax > 0 && (
+            <div className="flex justify-between text-gray-600">
+              <span>Tax</span><span>{formatCurrency(sale.tax)}</span>
+            </div>
+          )}
           <div className="flex justify-between font-bold text-base text-gray-900 border-t border-gray-300 pt-2 mt-2">
             <span>Grand Total</span><span className="text-emerald-700">{formatCurrency(sale.total)}</span>
           </div>
@@ -290,6 +296,7 @@ export function SaleReceiptPage() {
           items: Array.isArray(data.items) ? (data.items as SaleItem[]) : [],
           subtotal: Number(data.subtotal ?? 0),
           discount: Number(data.discount ?? 0),
+          discountPercent: data.discountPercent != null ? Number(data.discountPercent) : undefined,
           tax: Number(data.tax ?? 0),
           total: Number(data.total ?? 0),
           paymentMethod: String(data.paymentMethod ?? "cash"),

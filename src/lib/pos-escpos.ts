@@ -3,7 +3,9 @@ import type { CompanyProfile } from "@/types/domain";
 import type { Sale } from "@/components/modules/sales/sale-receipt-page";
 import type { ReceiptModel as InstallmentReceipt } from "@/components/modules/sales/installment-payment-receipt-page";
 
-const COLS = 42;
+import { THERMAL_ESC_COLS } from "@/lib/thermal-receipt";
+
+const COLS = THERMAL_ESC_COLS;
 const ESC = 0x1b;
 const GS = 0x1d;
 
@@ -61,6 +63,29 @@ function dash() {
   return line("-".repeat(COLS));
 }
 
+/** Font B — smaller text on 58mm paper */
+function setSmallFont(small: boolean) {
+  return raw(ESC, 0x4d, small ? 1 : 0);
+}
+
+function receiptInfoBlock(
+  title: string,
+  reference: string,
+  dateLine: string,
+  rows: { label: string; value: string }[] = []
+) {
+  const chunks: Uint8Array[] = [
+    setSmallFont(true),
+    pair(title, reference),
+    pair("", dateLine),
+  ];
+  for (const row of rows) {
+    chunks.push(pair(row.label, row.value));
+  }
+  chunks.push(setSmallFont(false), dash());
+  return concat(chunks);
+}
+
 function wrap(value: string) {
   const s = ascii(value);
   const rows: string[] = [];
@@ -72,25 +97,22 @@ function money(n: number) {
   return ascii(formatCurrency(n));
 }
 
-function phones(company: Pick<CompanyProfile, "phone" | "phoneSecondary">) {
-  const list = [company.phone, company.phoneSecondary].filter(
-    (p): p is string => typeof p === "string" && p.length > 0 && !/700.?000.?000/.test(p)
-  );
-  return list.join(" / ") || "+256 757 148631 / +256 754 604928";
-}
-
-function header(company: Pick<CompanyProfile, "name" | "tagline" | "phone" | "phoneSecondary" | "email" | "address">) {
-  return concat([
+function header(
+  company: Pick<CompanyProfile, "name" | "tagline" | "phone" | "phoneSecondary" | "email" | "address">,
+  logoRaster?: Uint8Array | null
+) {
+  const chunks: Uint8Array[] = [
     raw(ESC, 0x40),
     raw(ESC, 0x61, 0x01),
-    raw(ESC, 0x21, 0x10),
-    line(company.name || "HOME STITCH INTERIORS UG"),
-    raw(ESC, 0x21, 0x00),
-    line(company.tagline || "Where Comfort Is Tailored"),
-    wrap(company.address || "Busega Round about, Kampala, Uganda"),
-    line(phones(company)),
-    dash(),
-  ]);
+  ];
+  if (logoRaster && logoRaster.length > 0) {
+    chunks.push(logoRaster);
+  }
+  chunks.push(
+    raw(ESC, 0x61, 0x01),
+    dash()
+  );
+  return concat(chunks);
 }
 
 function footer(company: Pick<CompanyProfile, "email">, status: string) {
@@ -110,7 +132,8 @@ function footer(company: Pick<CompanyProfile, "email">, status: string) {
 
 export function encodeSaleReceipt(
   sale: Sale,
-  company: Pick<CompanyProfile, "name" | "tagline" | "phone" | "phoneSecondary" | "email" | "address">
+  company: Pick<CompanyProfile, "name" | "tagline" | "phone" | "phoneSecondary" | "email" | "address">,
+  logoRaster?: Uint8Array | null
 ) {
   const date = sale.createdAt instanceof Date
     ? sale.createdAt
@@ -118,17 +141,19 @@ export function encodeSaleReceipt(
       ? new Date(sale.createdAt)
       : new Date();
   const chunks: Uint8Array[] = [
-    header(company),
-    raw(ESC, 0x21, 0x08),
-    line("RECEIPT"),
-    raw(ESC, 0x21, 0x00),
-    line(sale.saleNumber),
-    line(`${date.toLocaleDateString("en-UG")} ${formatTime12h(date)}`),
-    dash(),
-    raw(ESC, 0x61, 0x00),
-    line(`Customer: ${sale.customerName || "Walk-in"}`),
-    line(`Payment: ${PAYMENT_LABELS[sale.paymentMethod] ?? sale.paymentMethod}`),
-    dash(),
+    header(company, logoRaster),
+    receiptInfoBlock(
+      "RECEIPT",
+      sale.saleNumber,
+      `${date.toLocaleDateString("en-UG")} ${formatTime12h(date)}`,
+      [
+        { label: "Customer", value: sale.customerName || "Walk-in" },
+        {
+          label: "Payment",
+          value: PAYMENT_LABELS[sale.paymentMethod] ?? sale.paymentMethod,
+        },
+      ]
+    ),
     pair("Item", "Total"),
     dash(),
   ];
@@ -140,8 +165,16 @@ export function encodeSaleReceipt(
 
   chunks.push(dash());
   chunks.push(pair("Subtotal", money(sale.subtotal)));
-  if (sale.discount > 0) chunks.push(pair("Discount", `-${money(sale.discount)}`));
-  chunks.push(pair("Tax", money(sale.tax)));
+  if (sale.discount > 0) {
+    const pct =
+      sale.discountPercent != null && sale.discountPercent > 0
+        ? ` (${sale.discountPercent.toFixed(1)}%)`
+        : "";
+    chunks.push(pair(`Discount${pct}`, `-${money(sale.discount)}`));
+  }
+  if (sale.tax > 0) {
+    chunks.push(pair("Tax", money(sale.tax)));
+  }
   chunks.push(raw(ESC, 0x21, 0x08));
   chunks.push(pair("TOTAL", money(sale.total)));
   chunks.push(raw(ESC, 0x21, 0x00));
@@ -151,26 +184,31 @@ export function encodeSaleReceipt(
 
 export function encodeInstallmentReceipt(
   data: InstallmentReceipt,
-  company: Pick<CompanyProfile, "name" | "tagline" | "phone" | "phoneSecondary" | "email" | "address">
+  company: Pick<CompanyProfile, "name" | "tagline" | "phone" | "phoneSecondary" | "email" | "address">,
+  logoRaster?: Uint8Array | null
 ) {
   const { plan, payment, payments, paymentNo, paymentCount } = data;
   const history = [...payments].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   const status = plan.balance <= 0 ? "PAID IN FULL" : "PARTIAL PAYMENT";
-  const chunks: Uint8Array[] = [
-    header(company),
-    raw(ESC, 0x21, 0x08),
-    line("INSTALLMENT RECEIPT"),
-    raw(ESC, 0x21, 0x00),
-    line(plan.planNumber),
-    line(`${payment.paidAt.toLocaleDateString("en-UG")} ${formatTime12h(payment.paidAt)}`),
-    dash(),
-    raw(ESC, 0x61, 0x00),
-    line(`Customer: ${plan.customerName || "Walk-in"}`),
+  const installmentRows: { label: string; value: string }[] = [
+    { label: "Customer", value: plan.customerName || "Walk-in" },
   ];
-  if (plan.customerPhone) chunks.push(line(`Phone: ${plan.customerPhone}`));
-  chunks.push(line(`This payment: ${PAYMENT_LABELS[payment.paymentMethod] ?? payment.paymentMethod}`));
-  chunks.push(line(`Instalment: ${paymentNo} of ${paymentCount}`));
-  chunks.push(dash());
+  if (plan.customerPhone) installmentRows.push({ label: "Phone", value: plan.customerPhone });
+  installmentRows.push({
+    label: "Payment",
+    value: PAYMENT_LABELS[payment.paymentMethod] ?? payment.paymentMethod,
+  });
+  installmentRows.push({ label: "Instalment", value: `${paymentNo} of ${paymentCount}` });
+
+  const chunks: Uint8Array[] = [
+    header(company, logoRaster),
+    receiptInfoBlock(
+      "INSTALLMENT",
+      plan.planNumber,
+      `${payment.paidAt.toLocaleDateString("en-UG")} ${formatTime12h(payment.paidAt)}`,
+      installmentRows
+    ),
+  ];
   chunks.push(wrap(plan.description));
   chunks.push(dash());
   chunks.push(pair("# Payment", "Amount"));
@@ -193,10 +231,11 @@ export function encodeInstallmentReceipt(
 }
 
 export function encodeTestReceipt(
-  company: Pick<CompanyProfile, "name" | "tagline" | "phone" | "phoneSecondary" | "email" | "address">
+  company: Pick<CompanyProfile, "name" | "tagline" | "phone" | "phoneSecondary" | "email" | "address">,
+  logoRaster?: Uint8Array | null
 ) {
   return concat([
-    header(company),
+    header(company, logoRaster),
     raw(ESC, 0x21, 0x08),
     line("PRINTER TEST"),
     raw(ESC, 0x21, 0x00),

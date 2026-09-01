@@ -14,6 +14,7 @@ import {
   User,
   X,
   CreditCard,
+  Pencil,
 } from "lucide-react";
 import { cn, formatCurrency, formatTime12h } from "@/lib/utils";
 import { createEntity, getEntity, listEntities } from "@/services/entity.service";
@@ -30,6 +31,7 @@ import {
 } from "@/services/installment.service";
 import { useAuth } from "@/hooks/use-auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
+import { loadThermalHeaderRaster } from "@/lib/pos-logo";
 import { encodeInstallmentReceipt, encodeSaleReceipt, encodeTestReceipt } from "@/lib/pos-escpos";
 import {
   connectPosPrinter,
@@ -47,6 +49,7 @@ import {
   type DesktopPrinter,
 } from "@/lib/pos-desktop";
 import { bytesToBase64, queuePosPrintJob } from "@/lib/pos-print-jobs";
+import { computePosSaleTotals, lineDiscountPercent } from "@/lib/pos-totals";
 import { PosPrinterSettingsModal } from "@/components/modules/sales/pos-printer-settings";
 import {
   FALLBACK_COMPANY,
@@ -73,6 +76,7 @@ interface CartItem {
   productId: string;
   name: string;
   sku: string;
+  systemPrice: number;
   price: number;
   qty: number;
   taxRate: number;
@@ -137,18 +141,37 @@ function NumpadButton({
 function CartRow({
   item,
   selected,
+  editingPrice,
+  onEditPriceToggle,
   onSelect,
   onQtyChange,
+  onPriceChange,
   onRemove,
 }: {
   item: CartItem;
   selected: boolean;
+  editingPrice: boolean;
+  onEditPriceToggle: (open: boolean) => void;
   onSelect: () => void;
   onQtyChange: (delta: number) => void;
+  onPriceChange: (price: number) => void;
   onRemove: () => void;
 }) {
+  const [priceDraft, setPriceDraft] = useState(String(item.price));
   const taxAmt = (item.price * item.qty * item.taxRate) / 100;
   const lineTotal = item.price * item.qty + taxAmt;
+  const bargained = item.price < item.systemPrice;
+  const discountPct = lineDiscountPercent(item.systemPrice, item.price);
+
+  useEffect(() => {
+    if (editingPrice) setPriceDraft(String(item.price));
+  }, [editingPrice, item.price]);
+
+  const commitPrice = () => {
+    const next = Math.max(0, Math.round(Number(priceDraft) || 0));
+    onPriceChange(next);
+    onEditPriceToggle(false);
+  };
 
   return (
     <tr
@@ -161,9 +184,74 @@ function CartRow({
       <td className="py-2 px-3 text-sm font-medium">
         <div>{item.name}</div>
         <div className="text-xs text-gray-400">{item.sku}</div>
+        {bargained && (
+          <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
+            −{discountPct.toFixed(1)}% off list
+          </div>
+        )}
       </td>
-      <td className="py-2 px-3 text-sm text-right whitespace-nowrap">
-        {formatCurrency(item.price)}
+      <td className="py-2 px-3 text-sm text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        {editingPrice ? (
+          <div className="flex flex-col items-end gap-1">
+            <input
+              type="number"
+              min={0}
+              step={1}
+              autoFocus
+              value={priceDraft}
+              onChange={(e) => setPriceDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitPrice();
+                if (e.key === "Escape") {
+                  setPriceDraft(String(item.price));
+                  onEditPriceToggle(false);
+                }
+              }}
+              className="w-28 rounded border border-violet-300 px-2 py-1 text-right text-sm font-medium focus:outline-none focus:ring-2 focus:ring-violet-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={commitPrice}
+                className="text-xs px-2.5 py-1 rounded-md bg-violet-600 text-white font-semibold hover:bg-violet-700"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPriceDraft(String(item.price));
+                  onEditPriceToggle(false);
+                }}
+                className="text-xs px-2.5 py-1 rounded-md bg-gray-200 text-gray-700 font-medium hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="font-medium">{formatCurrency(item.price)}</div>
+            {bargained && (
+              <div className="text-[10px] text-gray-400 line-through">
+                {formatCurrency(item.systemPrice)}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setPriceDraft(String(item.price));
+                onEditPriceToggle(true);
+              }}
+              title="Edit price (F12)"
+              className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-800 shadow-sm hover:bg-violet-100 hover:border-violet-400"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit price
+              <span className="text-[9px] font-normal text-violet-500">F12</span>
+            </button>
+          </>
+        )}
       </td>
       <td className="py-2 px-3 text-sm text-center">
         <div className="flex items-center justify-center gap-1">
@@ -520,11 +608,13 @@ function ToolbarButton({
   icon,
   onClick,
   danger,
+  shortcut,
 }: {
   label: string;
   icon?: React.ReactNode;
   onClick: () => void;
   danger?: boolean;
+  shortcut?: string;
 }) {
   return (
     <button
@@ -539,6 +629,9 @@ function ToolbarButton({
     >
       {icon}
       <span>{label}</span>
+      {shortcut && (
+        <span className="text-[9px] font-normal text-gray-400 tracking-wide">{shortcut}</span>
+      )}
     </button>
   );
 }
@@ -555,6 +648,7 @@ export function PosPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
+  const [priceEditRow, setPriceEditRow] = useState<number | null>(null);
   const [customerName, setCustomerName] = useState("Walk-in Customer");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [defaultTaxRate, setDefaultTaxRate] = useState(0);
@@ -567,6 +661,7 @@ export function PosPage() {
   const [mobileMoneyStep, setMobileMoneyStep] = useState(false);
   const [showInstallments, setShowInstallments] = useState(false);
   const [company, setCompany] = useState<CompanyProfile>(FALLBACK_COMPANY as CompanyProfile);
+  const [logoRaster, setLogoRaster] = useState<Uint8Array | null>(null);
   const [printerReady, setPrinterReady] = useState(false);
   const [showPrinterSettings, setShowPrinterSettings] = useState(false);
   const [printNotice, setPrintNotice] = useState<{ ok: boolean; text: string } | null>(null);
@@ -599,7 +694,9 @@ export function PosPage() {
       );
     });
     getCompanyProfile().then((co) => {
-      if (co) setCompany(co);
+      const profile = co ?? (FALLBACK_COMPANY as CompanyProfile);
+      setCompany(profile);
+      void loadThermalHeaderRaster(profile).then(setLogoRaster);
     });
   }, []);
 
@@ -618,6 +715,7 @@ export function PosPage() {
           productId: `invoice:${invoiceId}`,
           name: label.slice(0, 80),
           sku: String(inv.invoiceNumber ?? "INV"),
+          systemPrice: Number(inv.total ?? 0),
           price: Number(inv.total ?? 0),
           qty: 1,
           taxRate: 0,
@@ -671,6 +769,7 @@ export function PosPage() {
           productId: product.id,
           name: product.name,
           sku: product.sku,
+          systemPrice: product.sellingPrice,
           price: product.sellingPrice,
           qty: 1,
           taxRate: defaultTaxRate,
@@ -688,10 +787,10 @@ export function PosPage() {
   const printPosReceipt = useCallback(async (job: { sale: ReceiptSale } | { installment: InstallmentReceiptModel } | { test: true }) => {
     const kind = "test" in job ? "test" : "sale" in job ? "sale" : "installment";
     const bytes = kind === "test"
-      ? encodeTestReceipt(company)
+      ? encodeTestReceipt(company, logoRaster)
       : kind === "sale" && "sale" in job
-        ? encodeSaleReceipt(job.sale, company)
-        : encodeInstallmentReceipt((job as { installment: InstallmentReceiptModel }).installment, company);
+        ? encodeSaleReceipt(job.sale, company, logoRaster)
+        : encodeInstallmentReceipt((job as { installment: InstallmentReceiptModel }).installment, company, logoRaster);
     const okText = kind === "test" ? "Test printed" : "Receipt printed";
     try {
       if (isDesktopPos() && !isPosPrinterConnected()) {
@@ -724,7 +823,7 @@ export function PosPage() {
         : `Print failed: ${explainPrinterError(err)}`;
       showPrintNotice(false, text);
     }
-  }, [company, showPrintNotice, user]);
+  }, [company, logoRaster, showPrintNotice, user]);
 
   const handleBarcode = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (showPayWidget || installmentWidget) return;
@@ -745,9 +844,9 @@ export function PosPage() {
       return;
     }
 
-    // Digits — always build the buffer
+    // Digits — build buffer (up to 9 digits for UGX prices)
     if (/^\d$/.test(key)) {
-      setNumpadBuffer((b) => (b.length < 6 ? b + key : b)); // cap at 6 digits
+      setNumpadBuffer((b) => (b.length < 9 ? b + key : b));
       return;
     }
 
@@ -808,15 +907,33 @@ export function PosPage() {
       setNumpadBuffer("");
       return;
     }
+
+    if (key === "PRICE") {
+      if (hasBuffer) {
+        setCart((prev) =>
+          prev.map((item, idx) =>
+            idx === selectedRow ? { ...item, price: bufferVal } : item
+          )
+        );
+      }
+      setNumpadBuffer("");
+      return;
+    }
   };
 
-  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-  const taxTotal = cart.reduce((s, i) => s + (i.price * i.qty * i.taxRate) / 100, 0);
-  const grandTotal = subtotal + taxTotal;
+  const posTotals = computePosSaleTotals(cart);
+  const {
+    discountAmount,
+    discountPercent,
+    taxTotal,
+    grandTotal,
+    saleSubtotal,
+  } = posTotals;
 
   const resetSaleSession = useCallback(() => {
     setCart([]);
     setSelectedRow(null);
+    setPriceEditRow(null);
     setNumpadBuffer("");
     setBarcodeInput("");
     setCustomerName("Walk-in Customer");
@@ -833,6 +950,7 @@ export function PosPage() {
   const clearCart = () => {
     setCart([]);
     setSelectedRow(null);
+    setPriceEditRow(null);
     setNumpadBuffer("");
     setBarcodeInput("");
   };
@@ -855,6 +973,8 @@ export function PosPage() {
       description: i.name,
       quantity: i.qty,
       unitPrice: i.price,
+      systemUnitPrice: i.systemPrice,
+      lineDiscount: i.price < i.systemPrice ? (i.systemPrice - i.price) * i.qty : 0,
       taxRate: i.taxRate,
       total: i.price * i.qty * (1 + i.taxRate / 100),
     }));
@@ -862,8 +982,9 @@ export function PosPage() {
       saleNumber,
       customerName,
       items,
-      subtotal,
-      discount: 0,
+      subtotal: saleSubtotal,
+      discount: discountAmount,
+      ...(discountAmount > 0 ? { discountPercent: Math.round(discountPercent * 10) / 10 } : {}),
       tax: taxTotal,
       total: grandTotal,
       paymentMethod: chosenMethod,
@@ -910,7 +1031,7 @@ export function PosPage() {
         : `Receipt printed, but the sale failed to save: ${raw}`;
       alert(text);
     }
-  }, [cart, customerName, subtotal, taxTotal, grandTotal, paymentMethod, resetSaleSession, printPosReceipt]);
+  }, [cart, customerName, discountAmount, discountPercent, saleSubtotal, taxTotal, grandTotal, paymentMethod, resetSaleSession, printPosReceipt]);
 
   const confirmSelectedPayment = useCallback((methodOverride?: string) => {
     if (savingRef.current || cart.length === 0) return;
@@ -1051,6 +1172,56 @@ export function PosPage() {
     barcodeRef.current?.blur();
   }, [cart.length]);
 
+  useEffect(() => {
+    const isTypingTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (showPayWidget) return;
+
+      switch (e.key) {
+        case "F1":
+          e.preventDefault();
+          setShowPicker(true);
+          return;
+        case "F2":
+          e.preventDefault();
+          setShowCustomer(true);
+          return;
+        case "F3":
+          e.preventDefault();
+          setShowInstallments(true);
+          return;
+        case "F4":
+          e.preventDefault();
+          setShowPrinterSettings(true);
+          return;
+        case "F12":
+          e.preventDefault();
+          if (cart.length === 0) return;
+          {
+            const row = selectedRow ?? 0;
+            setSelectedRow(row);
+            setPriceEditRow(row);
+          }
+          return;
+        case " ":
+          if (isTypingTarget(e.target)) return;
+          e.preventDefault();
+          openPayWidget();
+          return;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showPayWidget, cart.length, selectedRow, openPayWidget]);
+
   const handleConnectPrinter = useCallback(async () => {
     try {
       await connectPosPrinter();
@@ -1130,9 +1301,10 @@ export function PosPage() {
 
       {/* ── Toolbar ── */}
       <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-200">
-        <ToolbarButton label="Products" icon={<ShoppingCart className="h-4 w-4" />} onClick={() => setShowPicker(true)} />
-        <ToolbarButton label="Customer" icon={<User className="h-4 w-4" />} onClick={() => setShowCustomer(true)} />
+        <ToolbarButton shortcut="F1" label="Products" icon={<ShoppingCart className="h-4 w-4" />} onClick={() => setShowPicker(true)} />
+        <ToolbarButton shortcut="F2" label="Customer" icon={<User className="h-4 w-4" />} onClick={() => setShowCustomer(true)} />
         <ToolbarButton
+          shortcut="F3"
           label="Installments"
           icon={<CreditCard className="h-4 w-4" />}
           onClick={() => setShowInstallments(true)}
@@ -1146,15 +1318,17 @@ export function PosPage() {
               ? "bg-black text-yellow-400 hover:bg-neutral-900"
               : "bg-gray-100 text-gray-500 hover:bg-gray-200"
           )}
-          title={printerReady ? "Thermal printer connected" : "Select thermal printer"}
+          title={printerReady ? "Thermal printer connected (F4)" : "Select thermal printer (F4)"}
         >
           <Printer className={cn("h-5 w-5", printerReady ? "text-yellow-400 fill-yellow-400" : "text-gray-400")} />
           Printer
+          <span className="text-[9px] font-normal text-gray-400 tracking-wide">F4</span>
         </button>
         <button
           type="button"
           onClick={openPayWidget}
           disabled={saving || cart.length === 0}
+          title="Pay (Space)"
           className={cn(
             "flex flex-col items-center justify-center gap-0.5 rounded-lg px-5 py-1.5 text-xs font-bold tracking-widest uppercase transition-all",
             cart.length > 0
@@ -1164,6 +1338,7 @@ export function PosPage() {
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <span className="text-base">💳</span>}
           PAY
+          <span className="text-[9px] font-normal tracking-wide opacity-80">Space</span>
         </button>
         <div className="flex-1" />
         <ToolbarButton label="Clear" icon={<Trash2 className="h-4 w-4" />} onClick={clearCart} danger />
@@ -1218,6 +1393,8 @@ export function PosPage() {
                       key={`${item.productId}-${idx}`}
                       item={item}
                       selected={selectedRow === idx}
+                      editingPrice={priceEditRow === idx}
+                      onEditPriceToggle={(open) => setPriceEditRow(open ? idx : null)}
                       onSelect={() => setSelectedRow(idx)}
                       onQtyChange={(delta) =>
                         setCart((prev) =>
@@ -1241,6 +1418,11 @@ export function PosPage() {
                         setCart((prev) => prev.filter((_, i) => i !== idx));
                         setSelectedRow(null);
                       }}
+                      onPriceChange={(price) =>
+                        setCart((prev) =>
+                          prev.map((it, i) => (i === idx ? { ...it, price } : it))
+                        )
+                      }
                     />
                   ))
                 )}
@@ -1269,10 +1451,15 @@ export function PosPage() {
           </div>
 
           {/* ── Footer Totals ── */}
-          <div className="bg-white border-t border-gray-200 px-4 py-3 grid grid-cols-4 gap-4 text-center shadow-inner">
+          <div className="bg-white border-t border-gray-200 px-4 py-3 grid grid-cols-5 gap-3 text-center shadow-inner">
             {[
-              { label: "Subtotal", value: formatCurrency(subtotal) },
-              { label: "Tax", value: formatCurrency(taxTotal) },
+              { label: "Subtotal", value: formatCurrency(saleSubtotal) },
+              ...(discountAmount > 0
+                ? [{ label: `Discount (${discountPercent.toFixed(1)}%)`, value: `-${formatCurrency(discountAmount)}` }]
+                : []),
+              ...(taxTotal > 0
+                ? [{ label: "Tax", value: formatCurrency(taxTotal) }]
+                : []),
               { label: "Total", value: formatCurrency(grandTotal) },
               { label: "Items", value: String(cart.reduce((s, i) => s + i.qty, 0)) },
             ].map(({ label, value }) => (
@@ -1305,6 +1492,15 @@ export function PosPage() {
                         {item.qty}
                       </span>
                     </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[10px] text-gray-400">price</span>
+                      <span className="text-sm font-semibold text-gray-800">{formatCurrency(item.price)}</span>
+                    </div>
+                    {item.price < item.systemPrice && (
+                      <p className="text-[10px] text-emerald-700 text-right">
+                        list {formatCurrency(item.systemPrice)} (−{lineDiscountPercent(item.systemPrice, item.price).toFixed(1)}%)
+                      </p>
+                    )}
                     {stock !== null && (
                       <p className={`text-[10px] text-right ${atLimit ? "text-red-500 font-semibold" : "text-gray-400"}`}>
                         {atLimit ? `⚠ max stock: ${stock}` : `stock: ${stock}`}
@@ -1337,6 +1533,9 @@ export function PosPage() {
           </div>
           <div className="px-3 mt-2 grid grid-cols-2 gap-2">
             <NumpadButton label="SET QTY" onClick={() => handleNumpad("SET")} className="bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold" />
+            <NumpadButton label="SET PRICE" onClick={() => handleNumpad("PRICE")} className="bg-violet-100 text-violet-700 hover:bg-violet-200 text-xs font-bold" />
+          </div>
+          <div className="px-3 mt-2">
             <NumpadButton label="CL" onClick={() => handleNumpad("CL")} className="bg-red-100 text-red-700 hover:bg-red-200" />
           </div>
 

@@ -1,9 +1,13 @@
+import { lineQty, resolvedUnitPrice } from "@/lib/sale-metrics";
+
 export interface SaleLineItem {
   productId?: string;
   description?: string;
   quantity?: number;
   qty?: number;
   unitPrice?: number;
+  systemUnitPrice?: number;
+  lineDiscount?: number;
   costPrice?: number;
 }
 
@@ -67,10 +71,10 @@ export function buildProfitReport(
 
     for (const raw of items) {
       const item = raw as SaleLineItem;
-      const qty = Number(item.quantity ?? item.qty ?? 0);
+      const qty = lineQty(item);
       if (qty <= 0) continue;
 
-      const sellingPrice = Number(item.unitPrice ?? 0);
+      const sellingPrice = resolvedUnitPrice(item);
       const productId = item.productId ? String(item.productId) : "";
       const costPrice =
         (productId ? productCostById.get(productId) : undefined) ??

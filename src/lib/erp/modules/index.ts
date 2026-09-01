@@ -39,6 +39,7 @@ export const productModule: EntityConfig = {
     { key: "status", label: "Status", format: "badge" },
   ],
   filters: [{ key: "status", label: "Status", options: statusOptions }],
+  rowAction: "delete",
 };
 
 export const categoryModule: EntityConfig = {

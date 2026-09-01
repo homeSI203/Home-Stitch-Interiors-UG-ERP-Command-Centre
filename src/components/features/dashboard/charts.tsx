@@ -93,6 +93,95 @@ interface CategoryChartProps {
   loading?: boolean;
 }
 
+interface MonthlySalesProfitChartProps {
+  data?: { month: string; revenue: number; profit: number }[];
+  loading?: boolean;
+}
+
+function formatAxisValue(value: number) {
+  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(0)}K`;
+  return String(value);
+}
+
+export function MonthlySalesProfitChart({ data = [], loading }: MonthlySalesProfitChartProps) {
+  if (loading) {
+    return (
+      <div className="h-full min-h-[280px] flex items-center justify-center">
+        <Skeleton className="h-[260px] w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="h-full min-h-[280px] flex items-center justify-center text-sm text-gray-400">
+        No sales data yet
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[280px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+          <XAxis
+            dataKey="month"
+            stroke="#9ca3af"
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            stroke="#9ca3af"
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={formatAxisValue}
+            width={48}
+          />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "#111827",
+              border: "none",
+              borderRadius: "10px",
+              color: "#f9fafb",
+              fontSize: "12px",
+            }}
+            formatter={(value: number, name: string) => [formatCurrency(value), name]}
+            labelStyle={{ color: "#d1d5db", marginBottom: 4 }}
+          />
+          <Bar
+            dataKey="revenue"
+            name="Sales"
+            fill="#10b981"
+            radius={[4, 4, 0, 0]}
+            maxBarSize={36}
+          />
+          <Bar
+            dataKey="profit"
+            name="Profit"
+            fill="#3b82f6"
+            radius={[4, 4, 0, 0]}
+            maxBarSize={36}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+      <div className="flex items-center justify-center gap-5 mt-2 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" />
+          Sales
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm bg-blue-500" />
+          Profit
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function CategoryChart({ data, loading }: CategoryChartProps) {
   if (loading) {
     return (

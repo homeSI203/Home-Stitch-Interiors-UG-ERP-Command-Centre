@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Download, Archive, Eye, Pencil, Inbox, Printer, CreditCard, LayoutGrid } from "lucide-react";
+import { Plus, Search, Download, Archive, Trash2, Eye, Pencil, Inbox, Printer, CreditCard, LayoutGrid } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { PageHeader, formatCellValue, Pagination } from "@/components/erp/page-h
 import type { EntityConfig } from "@/lib/erp/entity-config";
 import {
   archiveEntity,
+  deleteEntityPermanently,
   downloadCsv,
   exportToCsv,
   listEntities,
@@ -125,9 +126,29 @@ export function EntityListPage({ config }: { config: EntityConfig }) {
 
   const handleArchive = async (id: string) => {
     if (!confirm(`Archive this ${config.label.toLowerCase()}?`)) return;
-    await archiveEntity(config.collection, id);
-    setItems((prev) => prev.filter((item) => item.id !== id));
+    try {
+      await archiveEntity(config.collection, id);
+      setItems((prev) => prev.filter((item) => item.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to archive");
+    }
   };
+
+  const handleDelete = async (id: string, row?: Record<string, unknown>) => {
+    const name = row?.name ? String(row.name) : "";
+    const label = name
+      ? `${config.label.toLowerCase()} "${name}"`
+      : `this ${config.label.toLowerCase()}`;
+    if (!confirm(`Permanently delete ${label}? This cannot be undone.`)) return;
+    try {
+      await deleteEntityPermanently(config.collection, id);
+      setItems((prev) => prev.filter((item) => item.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    }
+  };
+
+  const useDelete = config.rowAction === "delete";
 
   return (
     <DashboardLayout
@@ -286,11 +307,19 @@ export function EntityListPage({ config }: { config: EntityConfig }) {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleArchive(String(row.id))}
+                              onClick={() =>
+                                useDelete
+                                  ? handleDelete(String(row.id), row)
+                                  : handleArchive(String(row.id))
+                              }
                               className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                              title="Archive"
+                              title={useDelete ? "Delete" : "Archive"}
                             >
-                              <Archive className="h-3.5 w-3.5" />
+                              {useDelete ? (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              ) : (
+                                <Archive className="h-3.5 w-3.5" />
+                              )}
                             </Button>
                           </PermissionGate>
                         )}

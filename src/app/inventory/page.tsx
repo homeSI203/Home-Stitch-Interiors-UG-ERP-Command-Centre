@@ -102,7 +102,8 @@ export default function InventoryPage() {
     );
   });
 
-  const totalValue = filtered.reduce((s, p) => s + p.costPrice * p.quantity, 0);
+  const stockValueSell = filtered.reduce((s, p) => s + p.sellingPrice * p.quantity, 0);
+  const stockValueCost = filtered.reduce((s, p) => s + p.costPrice * p.quantity, 0);
   const lowStock   = filtered.filter((p) => p.quantity <= p.reorderLevel).length;
   const outOfStock = filtered.filter((p) => p.quantity === 0).length;
 
@@ -130,8 +131,8 @@ export default function InventoryPage() {
       {/* ── Summary Cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
-          { label: "Total Products", value: String(products.length), sub: "active items" },
-          { label: "Stock Value",    value: formatCurrency(totalValue), sub: "at cost price" },
+          { label: "Stock Value (Cost)", value: formatCurrency(stockValueCost), sub: "qty × cost price" },
+          { label: "Stock Value (Sell)", value: formatCurrency(stockValueSell), sub: "qty × selling price" },
           { label: "Low Stock",      value: String(lowStock),  sub: "below reorder level", warn: lowStock > 0 },
           { label: "Out of Stock",   value: String(outOfStock), sub: "zero quantity",       warn: outOfStock > 0 },
         ].map(({ label, value, sub, warn }) => (

@@ -8,6 +8,8 @@ import { Loader2, Printer, ArrowLeft, LayoutTemplate } from "lucide-react";
 import { printReceiptHtml, useAutoPrint } from "@/lib/print-receipt";
 import { getCompanyProfile } from "@/services/company.service";
 import type { CompanyProfile } from "@/types/domain";
+import { THERMAL_RECEIPT_CLASSES } from "@/lib/thermal-receipt";
+import { ThermalReceiptHeader, ThermalReceiptInfo } from "@/components/receipts/thermal-receipt-header";
 import { BackToPreviousPage } from "@/components/erp/back-to-previous-page";
 import {
   getInstallmentPayment,
@@ -65,30 +67,20 @@ export function ThermalInstallmentReceipt({ data, company }: { data: ReceiptMode
   const fullyPaid = plan.balance <= 0;
   const history = [...payments].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   return (
-    <div className="bg-white font-mono text-[11px] leading-snug w-[300px] mx-auto p-4 border border-dashed border-gray-300 shadow-sm">
-      <div className="text-center mb-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={companyLogo(company)}
-          alt={company.name}
-          className="h-12 w-auto object-contain mx-auto mb-2"
+    <div className={THERMAL_RECEIPT_CLASSES}>
+      <ThermalReceiptHeader company={company}>
+        <ThermalReceiptInfo
+          title="INSTALLMENT RECEIPT"
+          reference={plan.planNumber}
+          dateLine={`${date.toLocaleDateString("en-UG")} ${formatTime12h(date)}`}
+          rows={[
+            { label: "Customer", value: plan.customerName || "Walk-in" },
+            ...(plan.customerPhone ? [{ label: "Phone", value: plan.customerPhone }] : []),
+            { label: "Payment", value: paymentLabel(payment.paymentMethod) },
+            { label: "Instalment", value: `${paymentNo} of ${paymentCount}` },
+          ]}
         />
-        <p className="font-bold text-[13px] tracking-wide">{company.name}</p>
-        <p className="text-gray-500 text-[8px] leading-tight">{company.tagline}</p>
-        <p className="text-gray-500 text-[8px] leading-tight">{company.address}</p>
-        <p className="text-gray-500 text-[8px] leading-tight">{companyPhones(company)}</p>
-        <div className="border-t border-dashed border-gray-400 my-2" />
-        <p className="font-semibold text-[12px]">INSTALLMENT RECEIPT</p>
-        <p className="text-gray-500">{plan.planNumber}</p>
-        <p className="text-gray-500">{date.toLocaleDateString("en-UG")} {formatTime12h(date)}</p>
-      </div>
-
-      <div className="mb-2 border-t border-dashed border-gray-400 pt-2">
-        <p>Customer: <span className="font-semibold">{plan.customerName || "Walk-in"}</span></p>
-        {plan.customerPhone && <p>Phone: <span className="font-semibold">{plan.customerPhone}</span></p>}
-        <p>This payment: <span className="font-semibold">{paymentLabel(payment.paymentMethod)}</span></p>
-        <p>Instalment: <span className="font-semibold">{paymentNo} of {paymentCount}</span></p>
-      </div>
+      </ThermalReceiptHeader>
 
       <div className="border-t border-dashed border-gray-400 pt-2 mb-2">
         <p className="text-gray-500 mb-1">Items / Description</p>

@@ -72,6 +72,10 @@ export interface AuthSession {
 }
 
 export interface DashboardStats {
+  dailySales: number;
+  dailyRevenue: number;
+  dailyDiscount: number;
+  dailyProfit: number;
   totalSales: number;
   totalRevenue: number;
   totalProfit: number;
@@ -79,6 +83,7 @@ export interface DashboardStats {
   totalProducts: number;
   lowStockItems: number;
   pendingOrders: number;
+  monthlyPerformance: { month: string; revenue: number; profit: number }[];
   monthlyRevenue: { month: string; revenue: number }[];
   salesByCategory: { category: string; sales: number }[];
   recentSales: {

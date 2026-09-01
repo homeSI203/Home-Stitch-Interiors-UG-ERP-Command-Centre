@@ -63,7 +63,7 @@ export interface EntityConfig {
   detailFields?: string[];
   statusField?: string;
   /** Override the default Archive row action. "print" opens /<basePath>/<id>/<printPath> */
-  rowAction?: "archive" | "print";
+  rowAction?: "archive" | "delete" | "print";
   /** URL segment for print action. Defaults to "receipt" (sales) or use "pdf" for documents. */
   printPath?: string;
   /** Custom print URL per row (e.g. receipts that belong to a sale) */

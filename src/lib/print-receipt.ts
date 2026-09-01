@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import {
+  THERMAL_BASE_FONT_PX,
+  THERMAL_CONTENT_MM,
+  THERMAL_MARGIN_MM,
+  THERMAL_PAPER_MM,
+  THERMAL_RECEIPT_PRINT_CSS,
+} from "@/lib/thermal-receipt";
 
 const RECEIPT_FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Roboto+Mono:wght@400;700&display=swap');`;
 
@@ -23,11 +30,30 @@ const RECEIPT_PRINT_CSS = `
 .col-span-12 { grid-column: span 12; }
 .justify-between { justify-content: space-between; }
 .items-start { align-items: flex-start; }
+.items-center { align-items: center; }
+.gap-1\\.5 { gap: 0.375rem; }
+.shrink-0 { flex-shrink: 0; }
+.flex-1 { flex: 1 1 0%; }
+.min-w-0 { min-width: 0; }
+.h-9 { height: 2.25rem; }
+.w-9 { width: 2.25rem; }
+.h-14 { height: 3.5rem; }
+.w-14 { width: 3.5rem; }
+.h-\\[4\\.25rem\\] { height: 4.25rem; }
+.w-\\[4\\.25rem\\] { width: 4.25rem; }
+.space-y-0\\.5 > * + * { margin-top: 0.125rem; }
+.leading-\\[1\\.15\\] { line-height: 1.15; }
+.leading-\\[1\\.1\\] { line-height: 1.1; }
+.text-gray-600 { color: #4b5563; }
+.mb-0 { margin-bottom: 0; }
+.mt-0\\.5 { margin-top: 0.125rem; }
+.pt-0 { padding-top: 0; }
+.text-\\[7px\\] { font-size: 7px; }
 .w-full { width: 100%; }
 .w-64 { width: 16rem; }
 .max-w-\\[794px\\] { max-width: 794px; }
 .my-2 { margin-top: 0.5rem; margin-bottom: 0.5rem; }
-.w-\\[300px\\] { width: 300px; }
+.w-\\[300px\\] { width: ${THERMAL_CONTENT_MM}mm; max-width: 100%; }
 .mx-auto { margin-left: auto; margin-right: auto; }
 .h-12 { height: 3rem; }
 .h-16 { height: 4rem; }
@@ -80,13 +106,20 @@ const RECEIPT_PRINT_CSS = `
 .text-gray-500 { color: #6b7280; }
 .text-gray-600 { color: #4b5563; }
 .text-gray-700 { color: #374151; }
+.space-y-1 > * + * { margin-top: 0.25rem; }
+.w-\\[4\\.25rem\\] { width: 4.25rem; }
 .text-gray-900 { color: #111827; }
+.pl-1 { padding-left: 0.25rem; }
 .text-green-700 { color: #15803d; }
 .text-emerald-700 { color: #047857; }
 .text-amber-700 { color: #b45309; }
 .text-xs { font-size: 0.75rem; }
 .text-\\[8px\\] { font-size: 8px; }
 .text-\\[9px\\] { font-size: 9px; }
+.text-\\[10px\\] { font-size: 10px; }
+.text-\\[11px\\] { font-size: 11px; }
+.text-\\[12px\\] { font-size: 12px; }
+.text-\\[13px\\] { font-size: 13px; }
 .text-sm { font-size: 0.875rem; }
 .text-base { font-size: 1rem; }
 .text-lg { font-size: 1.125rem; }
@@ -183,16 +216,20 @@ export function printReceiptHtml(opts: {
     styles: `
       ${isA4 ? RECEIPT_FONT_IMPORT : ""}
       ${RECEIPT_PRINT_CSS}
+      ${isA4 ? "" : THERMAL_RECEIPT_PRINT_CSS}
       body {
         font-family: ${isA4 ? "'Inter', sans-serif" : "ui-monospace, Consolas, monospace"};
-        font-size: ${isA4 ? "12px" : "11px"};
+        font-size: ${isA4 ? "12px" : `${THERMAL_BASE_FONT_PX}px`};
         background: white;
         color: #111;
-        ${isA4 ? "" : "display:flex;justify-content:center;padding:8px;"}
+        margin: 0;
+        padding: 0;
+        ${isA4 ? "" : `width: ${THERMAL_PAPER_MM}mm;`}
+        ${isA4 ? "" : "display:flex;justify-content:center;"}
       }
       @page {
-        size: ${isA4 ? "A4 portrait" : "80mm auto"};
-        margin: ${isA4 ? "15mm" : "4mm"};
+        size: ${isA4 ? "A4 portrait" : `${THERMAL_PAPER_MM}mm auto`};
+        margin: ${isA4 ? "15mm" : `${THERMAL_MARGIN_MM}mm`};
       }
     `,
   });
@@ -253,7 +290,7 @@ function printViaIframe(
   iframe.style.position = "fixed";
   iframe.style.left = "-10000px";
   iframe.style.top = "0";
-  iframe.style.width = paper === "thermal" ? "80mm" : "210mm";
+  iframe.style.width = paper === "thermal" ? `${THERMAL_PAPER_MM}mm` : "210mm";
   iframe.style.height = paper === "thermal" ? "200mm" : "297mm";
   iframe.style.border = "0";
   iframe.style.opacity = "0";
