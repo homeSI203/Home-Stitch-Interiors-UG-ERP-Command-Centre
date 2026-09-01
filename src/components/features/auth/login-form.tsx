@@ -26,7 +26,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, Mail, Lock, Sparkles, X } from "lucide-react";
+import { Loader2, Mail, Lock, Sparkles, X, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import { COMPANY } from "@/lib/navigation";
 
@@ -44,6 +44,7 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [savedEmails, setSavedEmails] = useState<string[]>([]);
   const [useOtherEmail, setUseOtherEmail] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const passwordRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
   const setSession = useAuthStore((state) => state.setSession);
@@ -241,19 +242,32 @@ export function LoginForm() {
                 </Link>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   placeholder="••••••••"
-                  className="pl-10"
+                  className="pl-10 pr-10"
                   {...passwordRegister}
                   ref={(el) => {
                     passwordRegisterRef(el);
                     passwordRef.current = el;
                   }}
                 />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
               {errors.password && (
                 <p className="text-sm text-destructive">
