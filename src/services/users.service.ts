@@ -158,6 +158,10 @@ export async function activateUser(uid: string): Promise<void> {
   await updateUserProfile(uid, { active: true });
 }
 
+export async function deactivateUser(uid: string): Promise<void> {
+  await updateUserProfile(uid, { active: false });
+}
+
 export async function deleteUserProfile(uid: string): Promise<void> {
   await deleteDoc(doc(getFirebaseDb(), "users", uid));
 }
