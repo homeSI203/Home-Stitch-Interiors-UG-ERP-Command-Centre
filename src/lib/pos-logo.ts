@@ -89,8 +89,8 @@ export async function loadThermalHeaderRaster(
 
   try {
     const img = await loadImage(src);
-    const logoMaxH = 80;
-    const logoMaxW = Math.floor(canvasWidth * 0.58);
+    const logoMaxH = 96;
+    const logoMaxW = Math.floor(canvasWidth * 0.5);
     const { width: logoW, height: logoH } = scaleDimensions(img.width, img.height, logoMaxW, logoMaxH);
 
     const logoRowH = Math.max(logoH, 52);
@@ -99,8 +99,8 @@ export async function loadThermalHeaderRaster(
     const mctx = measure.getContext("2d");
     if (!mctx) return null;
 
-    const contactFont = "7px monospace";
-    const contactLineH = 8;
+    const contactFont = "9px monospace";
+    const contactLineH = 11;
     mctx.font = contactFont;
     const addressLines = wrapTextLines(mctx, address, canvasWidth - 4);
     const phoneLines = wrapTextLines(mctx, phones, canvasWidth - 4);
@@ -125,13 +125,13 @@ export async function loadThermalHeaderRaster(
     ctx.fillStyle = "#000000";
     ctx.textAlign = "right";
     ctx.textBaseline = "top";
-    ctx.font = "bold 11px monospace";
-    wrapCanvasText(ctx, name, textX, logoY + 2, textMaxW, 11);
+    ctx.font = "bold 14px monospace";
+    wrapCanvasText(ctx, name, textX, logoY + 2, textMaxW, 14);
 
     if (company.tagline) {
-      ctx.font = "8px monospace";
+      ctx.font = "10px monospace";
       ctx.fillStyle = "#444444";
-      wrapCanvasText(ctx, company.tagline, textX, logoY + 16, textMaxW, 9);
+      wrapCanvasText(ctx, company.tagline, textX, logoY + 20, textMaxW, 11);
     }
 
     let y = logoRowH + 2;

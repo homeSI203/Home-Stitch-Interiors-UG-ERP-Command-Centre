@@ -106,7 +106,7 @@ export function ThermalInstallmentReceipt({ data, company }: { data: ReceiptMode
       </div>
 
       <div className="border-t border-dashed border-gray-400 pt-2 space-y-0.5">
-        <div className="flex justify-between font-bold text-[13px]">
+        <div className="flex justify-between font-bold text-[15px]">
           <span>THIS PAYMENT</span>
           <span>{formatCurrency(payment.amount)}</span>
         </div>
@@ -134,7 +134,7 @@ export function ThermalInstallmentReceipt({ data, company }: { data: ReceiptMode
       <div className="text-center mt-4 border-t border-dashed border-gray-400 pt-3 text-gray-500">
         <p>Thank you for your business!</p>
         <p className="mt-1">{company.email}</p>
-        <p className="mt-2 text-[10px]">*** {fullyPaid ? "PAID IN FULL" : "PARTIAL PAYMENT"} ***</p>
+        <p className="mt-2 text-[11px]">*** {fullyPaid ? "PAID IN FULL" : "PARTIAL PAYMENT"} ***</p>
       </div>
     </div>
   );
@@ -323,7 +323,7 @@ export function InstallmentPaymentReceiptPage() {
             )}
           >
             <LayoutTemplate className="h-3.5 w-3.5" />
-            Small / Thermal
+            80mm Thermal
           </button>
           <button
             type="button"

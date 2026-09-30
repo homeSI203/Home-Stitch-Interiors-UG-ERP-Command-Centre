@@ -3,7 +3,7 @@ import type { CompanyProfile } from "@/types/domain";
 import type { Sale } from "@/components/modules/sales/sale-receipt-page";
 import type { ReceiptModel as InstallmentReceipt } from "@/components/modules/sales/installment-payment-receipt-page";
 
-import { THERMAL_ESC_COLS } from "@/lib/thermal-receipt";
+import { THERMAL_ESC_COLS, THERMAL_ESC_DOTS } from "@/lib/thermal-receipt";
 
 const COLS = THERMAL_ESC_COLS;
 const ESC = 0x1b;
@@ -63,9 +63,13 @@ function dash() {
   return line("-".repeat(COLS));
 }
 
-/** Font B — smaller text on 58mm paper */
+/** Font B — denser header text on 80mm paper */
 function setSmallFont(small: boolean) {
   return raw(ESC, 0x4d, small ? 1 : 0);
+}
+
+function setPrintWidthDots(dots: number) {
+  return raw(GS, 0x57, dots & 0xff, (dots >> 8) & 0xff);
 }
 
 function receiptInfoBlock(
@@ -103,6 +107,7 @@ function header(
 ) {
   const chunks: Uint8Array[] = [
     raw(ESC, 0x40),
+    setPrintWidthDots(THERMAL_ESC_DOTS),
     raw(ESC, 0x61, 0x01),
   ];
   if (logoRaster && logoRaster.length > 0) {

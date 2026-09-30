@@ -68,6 +68,7 @@ interface Product {
   sku: string;
   sellingPrice: number;
   quantity: number;
+  costPrice?: number;
   categoryName?: string;
   brandName?: string;
 }
@@ -688,6 +689,7 @@ export function PosPage() {
             sku: String(p.sku ?? ""),
             sellingPrice: Number(p.sellingPrice ?? 0),
             quantity: Number(p.quantity ?? 0),
+            costPrice: Number(p.costPrice ?? 0),
             categoryName: String(p.categoryName ?? ""),
             brandName: String(p.brandName ?? ""),
           }))
@@ -1151,6 +1153,13 @@ export function PosPage() {
           customerName: customer,
           description,
           totalAmount,
+          items: cart.map((i) => ({
+            productId: i.productId,
+            name: i.name,
+            qty: i.qty,
+            unitPrice: i.price,
+            costPrice: products.find((p) => p.id === i.productId)?.costPrice ?? 0,
+          })),
         });
       }
       await recordPayment(savedPlanId, {
@@ -1162,7 +1171,7 @@ export function PosPage() {
     } catch (err) {
       alert(err instanceof Error ? err.message : "Receipt printed, but the installment failed to save.");
     }
-  }, [installmentWidget, cart, customerName, grandTotal, user, resetSaleSession, printPosReceipt]);
+  }, [installmentWidget, cart, customerName, grandTotal, products, user, resetSaleSession, printPosReceipt]);
 
   const openPayWidget = useCallback(() => {
     if (cart.length === 0 || savingRef.current) return;

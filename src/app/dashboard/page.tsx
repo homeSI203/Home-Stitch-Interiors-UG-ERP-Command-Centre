@@ -135,7 +135,7 @@ export default function DashboardPage() {
   }, []);
 
   const PAYMENT_ICON: Record<string, string> = {
-    cash: "💵", mobile_money: "📱", card: "💳", bank: "🏦",
+    cash: "💵", mobile_money: "📱", card: "💳", bank: "🏦", installment: "📅",
   };
 
   return (

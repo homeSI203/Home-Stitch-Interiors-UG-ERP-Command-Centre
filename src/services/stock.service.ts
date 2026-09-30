@@ -9,7 +9,8 @@ export type StockSaleLine = {
 /** Reduce on-hand quantity for each sold product and log a stock-out movement. */
 export async function deductStockForSale(
   items: StockSaleLine[],
-  saleNumber: string
+  saleNumber: string,
+  reason = "POS sale"
 ): Promise<void> {
   for (const item of items) {
     if (!item.productId || item.productId.startsWith("invoice:")) continue;
@@ -31,7 +32,7 @@ export async function deductStockForSale(
       productId: item.productId,
       productName: item.name || String(product.name ?? ""),
       quantity: item.qty,
-      reason: "POS sale",
+      reason,
       reference: saleNumber,
     });
   }

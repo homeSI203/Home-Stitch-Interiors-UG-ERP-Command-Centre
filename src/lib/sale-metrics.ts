@@ -77,3 +77,9 @@ export function sumSaleCollectedTotals(sales: Record<string, unknown>[]): number
 export function sumSaleDiscountTotals(sales: Record<string, unknown>[]): number {
   return sales.reduce((sum, sale) => sum + saleDiscountTotal(sale), 0);
 }
+
+/** Sales posted from installment collections — cash close already counts the payment. */
+export function isInstallmentSaleRecord(sale: Record<string, unknown>): boolean {
+  if (sale.installmentPlanId !== undefined && String(sale.installmentPlanId) !== "") return true;
+  return sale.paymentMethod === "installment";
+}

@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase";
 import { createEntity } from "@/services/entity.service";
+import { deductStockForSale } from "@/services/stock.service";
 import {
   allocateProportionalPayment,
   computeProfitRatios,
@@ -20,6 +21,14 @@ import {
 } from "@/lib/installment-profit";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface InstallmentPlanItem {
+  productId: string;
+  name: string;
+  qty: number;
+  unitPrice: number;
+  costPrice?: number;
+}
 
 export interface InstallmentPlan {
   id: string;
@@ -62,6 +71,8 @@ export interface InstallmentPlan {
   laborCost?: number;
   deliveryDate?: string;
   saleId?: string;
+  items?: InstallmentPlanItem[];
+  stockDeducted?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -75,6 +86,7 @@ export interface InstallmentPayment {
   paymentMethod: string;
   notes?: string;
   receivedBy?: string;
+  saleId?: string;
   paidAt: Date;
   createdAt: Date;
 }
@@ -135,6 +147,16 @@ function toPlan(id: string, d: Record<string, unknown>): InstallmentPlan {
     laborCost: d.laborCost !== undefined ? Number(d.laborCost) : undefined,
     deliveryDate: d.deliveryDate ? String(d.deliveryDate) : undefined,
     saleId: d.saleId ? String(d.saleId) : undefined,
+    items: Array.isArray(d.items)
+      ? (d.items as Record<string, unknown>[]).map((item) => ({
+          productId: String(item.productId ?? ""),
+          name: String(item.name ?? item.description ?? ""),
+          qty: Number(item.qty ?? item.quantity ?? 1) || 1,
+          unitPrice: Number(item.unitPrice ?? item.price ?? 0),
+          costPrice: item.costPrice !== undefined ? Number(item.costPrice) : undefined,
+        }))
+      : undefined,
+    stockDeducted: Boolean(d.stockDeducted),
     createdAt: tsToDate(d.createdAt),
     updatedAt: tsToDate(d.updatedAt),
   };
@@ -151,6 +173,7 @@ function toPayment(id: string, d: Record<string, unknown>): InstallmentPayment {
     paymentMethod: String(d.paymentMethod ?? "cash"),
     notes: d.notes ? String(d.notes) : undefined,
     receivedBy: d.receivedBy ? String(d.receivedBy) : undefined,
+    saleId: d.saleId ? String(d.saleId) : undefined,
     paidAt: tsToDate(d.paidAt),
     createdAt: tsToDate(d.createdAt),
   };
@@ -202,9 +225,13 @@ export async function createInstallmentPlan(
     remainingBalance: sellingPrice,
     status: "active",
     planType: data.planType ?? "shop",
+    stockDeducted: false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
+  if (data.items && data.items.length > 0) {
+    payload.items = data.items;
+  }
   const extra = data as Record<string, unknown>;
   const optionalKeys = [
     "customerPhone",
@@ -239,64 +266,98 @@ export async function createInstallmentPlan(
   return ref.id;
 }
 
-/** Create a POS sale + receipt when a plan is fully paid (first time only). */
-async function completeInstallmentPlanIfNeeded(planId: string): Promise<void> {
+/** Each collection posts to Sales at the amount paid, tagged to the plan number (e.g. INST-000). */
+async function postInstallmentPaymentAsSale(
+  planId: string,
+  paymentId: string,
+  amount: number,
+  tenderMethod: string
+): Promise<void> {
+  const db = getFirebaseDb();
+  const paymentSnap = await getDoc(doc(db, "installmentPayments", paymentId));
+  if (paymentSnap.exists() && paymentSnap.data()?.saleId) return;
+
+  const planSnap = await getDoc(doc(db, "installments", planId));
+  if (!planSnap.exists()) return;
+
+  const plan = toPlan(planSnap.id, planSnap.data() as Record<string, unknown>);
+  const paymentsSnap = await getDocs(
+    query(
+      collection(db, "installmentPayments"),
+      where("planId", "==", planId),
+      orderBy("createdAt", "asc")
+    )
+  );
+  const paymentNo =
+    paymentsSnap.docs.findIndex((d) => d.id === paymentId) + 1 || paymentsSnap.size;
+  const isFinal = plan.balance <= 0;
+  const planNumber = plan.planNumber || `INST-${planId.slice(0, 6)}`;
+
+  const saleId = await createEntity("sales", {
+    saleNumber: planNumber,
+    customerName: plan.customerName,
+    items: [
+      {
+        description: `${planNumber} — payment ${paymentNo}${isFinal ? " (final)" : ""}`,
+        quantity: 1,
+        unitPrice: amount,
+        taxRate: 0,
+        total: amount,
+      },
+    ],
+    subtotal: amount,
+    discount: 0,
+    tax: 0,
+    total: amount,
+    amountPaid: amount,
+    paymentMethod: "installment",
+    paymentStatus: "paid",
+    notes: [
+      `Installment ${planNumber}`,
+      `Paid via ${tenderMethod}`,
+      plan.description,
+      isFinal ? "Final payment — goods released" : `Balance ${plan.balance}`,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    installmentPlanId: planId,
+    installmentPaymentId: paymentId,
+  });
+
+  await updateDoc(doc(db, "installmentPayments", paymentId), { saleId });
+  await updateDoc(doc(db, "installments", planId), {
+    saleId,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Goods leave the shop only when the customer has paid in full. */
+async function releaseStockOnFinalPayment(planId: string): Promise<void> {
   const db = getFirebaseDb();
   const planSnap = await getDoc(doc(db, "installments", planId));
   if (!planSnap.exists()) return;
 
-  const planData = planSnap.data() as Record<string, unknown>;
-  const sellingPrice = Number(planData.sellingPrice ?? planData.totalAmount ?? 0);
-  const amountPaid = Number(planData.amountPaid ?? planData.totalPaid ?? 0);
-  const balance = Math.max(0, sellingPrice - amountPaid);
+  const plan = toPlan(planSnap.id, planSnap.data() as Record<string, unknown>);
+  if (plan.balance > 0 || plan.stockDeducted || plan.planType === "tailor") return;
 
-  if (balance > 0 || planData.saleId) return;
+  const stockLines = (plan.items ?? [])
+    .filter((item) => item.productId && !item.productId.startsWith("invoice:"))
+    .map((item) => ({
+      productId: item.productId,
+      name: item.name,
+      qty: item.qty,
+    }));
+  if (stockLines.length === 0) return;
 
-  const paymentsSnap = await getDocs(
-    query(collection(db, "installmentPayments"), where("planId", "==", planId))
+  await deductStockForSale(
+    stockLines,
+    plan.planNumber,
+    "Installment completed — customer collected"
   );
-  const sorted = paymentsSnap.docs
-    .map((d) => toPayment(d.id, d.data() as Record<string, unknown>))
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-
-  const items = sorted.map((p, i) => {
-    const dateStr = p.createdAt.toLocaleDateString("en-UG", {
-      day: "2-digit", month: "short", year: "numeric",
-    });
-    return {
-      description: `Payment ${i + 1} – ${p.paymentMethod} (${dateStr})`,
-      quantity: 1,
-      unitPrice: p.amount,
-      taxRate: 0,
-      total: p.amount,
-    };
+  await updateDoc(doc(db, "installments", planId), {
+    stockDeducted: true,
+    updatedAt: serverTimestamp(),
   });
-
-  const saleId = await createEntity("sales", {
-    saleNumber: `INST-${String(planData.planNumber ?? planId)}`,
-    customerName: String(planData.customerName ?? ""),
-    items,
-    subtotal: amountPaid,
-    discount: 0,
-    tax: 0,
-    total: amountPaid,
-    paymentMethod: "installment",
-    paymentStatus: "paid",
-    notes: `Installment plan completed: ${String(planData.description ?? "")}`,
-    installmentPlanId: planId,
-  });
-
-  await createEntity("receipts", {
-    receiptNumber: `RCT-INST-${String(planData.planNumber ?? planId)}`,
-    saleId,
-    customerName: String(planData.customerName ?? ""),
-    amount: amountPaid,
-    paymentMethod: "installment",
-    notes: `Completed installment plan: ${String(planData.description ?? "")}`,
-    installmentPlanId: planId,
-  });
-
-  await updateDoc(doc(db, "installments", planId), { saleId, updatedAt: serverTimestamp() });
 }
 
 // ─── Payments ─────────────────────────────────────────────────────────────────
@@ -396,7 +457,8 @@ export async function recordPayment(
     return paymentRef.id;
   });
 
-  await completeInstallmentPlanIfNeeded(planId);
+  await postInstallmentPaymentAsSale(planId, paymentId, payment.amount, payment.paymentMethod);
+  await releaseStockOnFinalPayment(planId);
   return paymentId;
 }
 

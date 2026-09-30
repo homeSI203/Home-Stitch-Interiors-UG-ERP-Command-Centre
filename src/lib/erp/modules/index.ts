@@ -171,6 +171,7 @@ export const saleModule: EntityConfig = {
         { label: "Mobile Money", value: "mobile_money" },
         { label: "Bank Transfer", value: "bank" },
         { label: "Card", value: "card" },
+        { label: "Installment", value: "installment" },
       ],
     },
     {

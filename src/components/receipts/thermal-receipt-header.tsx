@@ -29,18 +29,18 @@ export function ThermalReceiptHeader({
         <img
           src={companyLogoUrl(company.logoUrl)}
           alt={company.name}
-          className="h-[4.25rem] w-[4.25rem] shrink-0 object-contain"
+          className="h-20 w-20 shrink-0 object-contain"
         />
         <div className="flex-1 min-w-0 text-right">
-          <p className="font-bold text-[9px] leading-tight uppercase tracking-wide">
+          <p className="font-bold text-[12px] leading-tight uppercase tracking-wide">
             {company.name}
           </p>
           {company.tagline ? (
-            <p className="text-gray-500 text-[7px] leading-tight mt-0.5">{company.tagline}</p>
+            <p className="text-gray-500 text-[9px] leading-tight mt-0.5">{company.tagline}</p>
           ) : null}
         </div>
       </div>
-      <div className="text-center text-gray-600 text-[7px] leading-[1.1] mt-0.5 pt-0">
+      <div className="text-center text-gray-600 text-[9px] leading-[1.15] mt-0.5 pt-0">
         {company.address ? <p>{company.address}</p> : null}
         <p>{companyPhones(company)}</p>
       </div>
@@ -52,11 +52,11 @@ export function ThermalReceiptHeader({
 /** Split row — label left (logo column), value right (like company header). */
 function ThermalSplitRow({
   left,
-  leftClass = "font-bold text-[9px] leading-tight uppercase tracking-wide",
+  leftClass = "font-bold text-[12px] leading-tight uppercase tracking-wide",
   right,
   subRight,
-  rightClass = "font-bold text-[9px] leading-tight",
-  subClass = "text-gray-500 text-[7px] leading-tight mt-0.5",
+  rightClass = "font-bold text-[12px] leading-tight",
+  subClass = "text-gray-500 text-[9px] leading-tight mt-0.5",
 }: {
   left: string;
   leftClass?: string;
@@ -67,7 +67,7 @@ function ThermalSplitRow({
 }) {
   return (
     <div className="flex items-start gap-1.5">
-      <div className="w-[4.25rem] shrink-0">
+      <div className="w-24 shrink-0">
         <p className={leftClass}>{left}</p>
       </div>
       <div className="flex-1 min-w-0 text-right">
@@ -99,9 +99,9 @@ export function ThermalReceiptInfo({
         <ThermalSplitRow
           key={row.label}
           left={row.label}
-          leftClass="text-[7px] leading-tight text-gray-600"
+          leftClass="text-[9px] leading-tight text-gray-600"
           right={row.value}
-          rightClass="font-semibold text-[7px] leading-tight text-gray-900"
+          rightClass="font-semibold text-[10px] leading-tight text-gray-900"
         />
       ))}
     </div>

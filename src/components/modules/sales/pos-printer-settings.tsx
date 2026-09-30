@@ -33,7 +33,9 @@ export function PosPrinterSettingsModal({
         <div className="flex items-start justify-between mb-4">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Thermal printer</h2>
-            <p className="text-sm text-gray-500 mt-0.5">POS prints straight to the till. No preview.</p>
+            <p className="text-sm text-gray-500 mt-0.5">
+              80mm × 80mm × 70gsm till roll. POS prints sales and installment receipts at that size.
+            </p>
           </div>
           <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
             <X className="h-5 w-5" />

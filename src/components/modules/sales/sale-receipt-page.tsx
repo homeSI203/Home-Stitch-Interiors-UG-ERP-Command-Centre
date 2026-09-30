@@ -111,7 +111,7 @@ export function ThermalReceipt({ sale, company }: { sale: Sale; company: Company
         {(sale.items ?? []).map((item, i) => (
           <div key={i} className="grid grid-cols-12 mb-1">
             <div className="col-span-12 truncate">{item.description}</div>
-            <div className="col-span-6 text-gray-500 pl-1 text-[10px]">
+            <div className="col-span-6 text-gray-500 pl-1 text-[11px]">
               @ {formatCurrency(item.unitPrice)}
               {item.taxRate ? ` +${item.taxRate}% tax` : ""}
             </div>
@@ -142,7 +142,7 @@ export function ThermalReceipt({ sale, company }: { sale: Sale; company: Company
             <span>Tax</span><span>{formatCurrency(sale.tax)}</span>
           </div>
         )}
-        <div className="flex justify-between font-bold text-[13px] border-t border-dashed border-gray-400 pt-1 mt-1">
+        <div className="flex justify-between font-bold text-[15px] border-t border-dashed border-gray-400 pt-1 mt-1">
           <span>TOTAL</span><span>{formatCurrency(sale.total)}</span>
         </div>
       </div>
@@ -151,7 +151,7 @@ export function ThermalReceipt({ sale, company }: { sale: Sale; company: Company
       <div className="text-center mt-4 border-t border-dashed border-gray-400 pt-3 text-gray-500">
         <p>Thank you for your business!</p>
         <p className="mt-1">{company.email}</p>
-        <p className="mt-2 text-[10px]">*** {sale.paymentStatus?.toUpperCase()} ***</p>
+        <p className="mt-2 text-[11px]">*** {sale.paymentStatus?.toUpperCase()} ***</p>
       </div>
     </div>
   );
@@ -357,7 +357,7 @@ export function SaleReceiptPage() {
             )}
           >
             <LayoutTemplate className="h-3.5 w-3.5" />
-            Small / Thermal
+            80mm Thermal
           </button>
           <button
             type="button"

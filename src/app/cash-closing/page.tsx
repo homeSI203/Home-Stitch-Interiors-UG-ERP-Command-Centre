@@ -21,6 +21,7 @@ import {
   localDateStr,
   reconcileDayClose,
 } from "@/lib/cash-closing";
+import { isInstallmentSaleRecord } from "@/lib/sale-metrics";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -226,7 +227,7 @@ export default function CashClosingPage() {
     try {
       const salesRes = await listEntities<Record<string, unknown>>("sales");
       const daySales = salesRes.items.filter((s) =>
-        localDateStr(tsToDate(s.createdAt)) === dateStr
+        localDateStr(tsToDate(s.createdAt)) === dateStr && !isInstallmentSaleRecord(s)
       );
       const sbm: ByMethod = {};
       let stotal = 0;

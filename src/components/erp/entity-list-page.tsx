@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader, formatCellValue, Pagination } from "@/components/erp/page-header";
 import type { EntityConfig } from "@/lib/erp/entity-config";
+import { useAuthorization } from "@/hooks/use-auth";
 import {
   archiveEntity,
   deleteEntityPermanently,
@@ -73,6 +74,7 @@ function EmptyState({ label, managePermission, basePath }: {
 // ─── EntityListPage ───────────────────────────────────────────────────────────
 
 export function EntityListPage({ config }: { config: EntityConfig }) {
+  const { isSuperAdmin } = useAuthorization();
   const [items, setItems] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -147,8 +149,6 @@ export function EntityListPage({ config }: { config: EntityConfig }) {
       setError(err instanceof Error ? err.message : "Failed to delete");
     }
   };
-
-  const useDelete = config.rowAction === "delete";
 
   return (
     <DashboardLayout
@@ -282,7 +282,7 @@ export function EntityListPage({ config }: { config: EntityConfig }) {
                             <Eye className="h-3.5 w-3.5" />
                           </Link>
                         </Button>
-                        {config.rowAction === "print" ? (
+                        {config.rowAction === "print" && (
                           <Button asChild variant="ghost" size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-brand-green hover:bg-brand-green/10"
                             title="Save PDF">
@@ -294,36 +294,8 @@ export function EntityListPage({ config }: { config: EntityConfig }) {
                               <Printer className="h-3.5 w-3.5" />
                             </Link>
                           </Button>
-                        ) : (
-                          <PermissionGate permission={config.managePermission}>
-                            {!config.hideEdit && (
-                              <Button asChild variant="ghost" size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-brand-gold hover:bg-brand-gold/10">
-                                <Link href={`${config.basePath}/${row.id}/edit`}>
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Link>
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() =>
-                                useDelete
-                                  ? handleDelete(String(row.id), row)
-                                  : handleArchive(String(row.id))
-                              }
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                              title={useDelete ? "Delete" : "Archive"}
-                            >
-                              {useDelete ? (
-                                <Trash2 className="h-3.5 w-3.5" />
-                              ) : (
-                                <Archive className="h-3.5 w-3.5" />
-                              )}
-                            </Button>
-                          </PermissionGate>
                         )}
-                        {config.rowAction === "print" && !config.hideEdit && (
+                        {!config.hideEdit && (
                           <PermissionGate permission={config.managePermission}>
                             <Button asChild variant="ghost" size="icon"
                               className="h-8 w-8 text-muted-foreground hover:text-brand-gold hover:bg-brand-gold/10"
@@ -334,6 +306,37 @@ export function EntityListPage({ config }: { config: EntityConfig }) {
                             </Button>
                           </PermissionGate>
                         )}
+                        {isSuperAdmin ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(String(row.id), row)}
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            title="Delete permanently"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : config.rowAction !== "print" ? (
+                          <PermissionGate permission={config.managePermission}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                config.rowAction === "delete"
+                                  ? handleDelete(String(row.id), row)
+                                  : handleArchive(String(row.id))
+                              }
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                              title={config.rowAction === "delete" ? "Delete" : "Archive"}
+                            >
+                              {config.rowAction === "delete" ? (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              ) : (
+                                <Archive className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </PermissionGate>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Pencil, ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Pencil, ArrowLeft, Trash2, Loader2 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { Button } from "@/components/ui/button";
@@ -10,20 +11,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader, formatCellValue } from "@/components/erp/page-header";
 import { BackToPreviousPage } from "@/components/erp/back-to-previous-page";
 import type { EntityConfig } from "@/lib/erp/entity-config";
-import { getEntity } from "@/services/entity.service";
-import { Loader2 } from "lucide-react";
+import { deleteEntityPermanently, getEntity } from "@/services/entity.service";
+import { useAuthorization } from "@/hooks/use-auth";
 
 export function EntityDetailPage({
   config,
   id,
   extraActions,
+  extraContent,
 }: {
   config: EntityConfig;
   id: string;
   extraActions?: React.ReactNode | ((data: Record<string, unknown> | null) => React.ReactNode);
+  extraContent?: React.ReactNode | ((data: Record<string, unknown> | null) => React.ReactNode);
 }) {
+  const router = useRouter();
+  const { isSuperAdmin } = useAuthorization();
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     getEntity<Record<string, unknown>>(config.collection, id).then((result) => {
@@ -31,6 +37,18 @@ export function EntityDetailPage({
       setLoading(false);
     });
   }, [config.collection, id]);
+
+  const handleDelete = async () => {
+    const label = String(data?.name ?? data?.saleNumber ?? data?.orderNumber ?? config.label);
+    if (!confirm(`Permanently delete ${label}? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await deleteEntityPermanently(config.collection, id);
+      router.push(config.basePath);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const actions = typeof extraActions === "function" ? extraActions(data) : extraActions;
 
@@ -56,6 +74,16 @@ export function EntityDetailPage({
                 </Link>
               </Button>
             </PermissionGate>
+            {isSuperAdmin && (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleting || loading || !data}
+              >
+                {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                Delete
+              </Button>
+            )}
             {actions}
           </>
         }
@@ -104,6 +132,11 @@ export function EntityDetailPage({
           )}
         </CardContent>
       </Card>
+      {!loading && data
+        ? typeof extraContent === "function"
+          ? extraContent(data)
+          : extraContent
+        : null}
     </DashboardLayout>
   );
 }

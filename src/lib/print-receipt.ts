@@ -57,6 +57,9 @@ const RECEIPT_PRINT_CSS = `
 .mx-auto { margin-left: auto; margin-right: auto; }
 .h-12 { height: 3rem; }
 .h-16 { height: 4rem; }
+.h-20 { height: 5rem; }
+.w-20 { width: 5rem; }
+.w-24 { width: 6rem; }
 .w-auto { width: auto; }
 .object-contain { object-fit: contain; }
 .block { display: block; }
@@ -120,6 +123,7 @@ const RECEIPT_PRINT_CSS = `
 .text-\\[11px\\] { font-size: 11px; }
 .text-\\[12px\\] { font-size: 12px; }
 .text-\\[13px\\] { font-size: 13px; }
+.text-\\[15px\\] { font-size: 15px; }
 .text-sm { font-size: 0.875rem; }
 .text-base { font-size: 1rem; }
 .text-lg { font-size: 1.125rem; }

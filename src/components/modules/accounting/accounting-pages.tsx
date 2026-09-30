@@ -38,7 +38,6 @@ export const PayablesPage = makeAccountingPage("Payables", "payables", [
   { key: "supplierName", label: "Supplier" },
   { key: "amount", label: "Amount", format: "currency" },
 ]);
-export const ReconciliationPage = makeAccountingPage("Bank Reconciliation", "accounts", ENTITY_MODULES.account.listColumns);
 export const BankAccountsPage = makeAccountingPage("Bank Accounts", "accounts", ENTITY_MODULES.account.listColumns);
 export const MobileMoneyPage = makeAccountingPage("Mobile Money Accounts", "accounts", ENTITY_MODULES.account.listColumns);
 export const OwnerDrawingsPage = makeAccountingPage("Owner Drawings", "journalEntries", ENTITY_MODULES.journalEntry.listColumns);

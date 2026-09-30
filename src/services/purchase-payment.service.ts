@@ -198,5 +198,12 @@ export async function recordPurchasePayment(
     payment.paidBy
   );
 
+  try {
+    const { reconcileHomeStitchAccount } = await import("@/services/home-stitch-account.service");
+    await reconcileHomeStitchAccount();
+  } catch {
+    /* payment is saved; ledger can be rebuilt from the account page */
+  }
+
   return paymentId;
 }

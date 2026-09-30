@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Download, Eye, Pencil, Printer, Merge } from "lucide-react";
+import { Plus, Search, Download, Eye, Pencil, Printer, Merge, Trash2 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { PermissionGate } from "@/components/auth/permission-gate";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   downloadCsv,
   exportToCsv,
 } from "@/services/entity.service";
+import { useAuthorization } from "@/hooks/use-auth";
 import type { LineItem } from "@/components/modules/documents/document-form";
 
 const PAGE_SIZE = 15;
@@ -45,6 +46,7 @@ function recalc(items: LineItem[], taxRate = 0) {
 }
 
 export function ProformaListPage() {
+  const { isSuperAdmin } = useAuthorization();
   const [items, setItems] = useState<ProformaDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -59,6 +61,17 @@ export function ProformaListPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  const handleDelete = async (row: ProformaDoc) => {
+    const label = row.proformaNumber ? `proforma ${row.proformaNumber}` : "this proforma";
+    if (!confirm(`Permanently delete ${label}? This cannot be undone.`)) return;
+    try {
+      await deleteEntityPermanently("proformaInvoices", row.id);
+      setItems((prev) => prev.filter((item) => item.id !== row.id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete");
+    }
+  };
 
   // Detect which proforma numbers have duplicates
   const duplicateNumbers = useMemo(() => {
@@ -253,6 +266,17 @@ export function ProformaListPage() {
                             className="h-8 w-8 text-muted-foreground hover:text-brand-green hover:bg-brand-green/10">
                             <Link href={`/proforma-invoices/${row.id}/pdf`} title="Save PDF"><Printer className="h-3.5 w-3.5" /></Link>
                           </Button>
+                          {isSuperAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Delete permanently"
+                              onClick={() => handleDelete(row)}
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

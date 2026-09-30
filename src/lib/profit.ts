@@ -1,4 +1,4 @@
-import { lineQty, resolvedUnitPrice } from "@/lib/sale-metrics";
+import { isInstallmentSaleRecord, lineQty, resolvedUnitPrice } from "@/lib/sale-metrics";
 
 export interface SaleLineItem {
   productId?: string;
@@ -198,16 +198,9 @@ export function buildCombinedProfitReport(
   };
 }
 
-function isInstallmentCompletionSale(sale: Record<string, unknown>): boolean {
-  return (
-    sale.paymentMethod === "installment" ||
-    sale.installmentPlanId !== undefined
-  );
-}
-
-/** POS sales only — excludes completed installment plan sales (profit recognized per payment). */
+/** POS sales only — installment profit is recognized on each payment, not these sale rows. */
 export function posSalesForProfit(sales: Record<string, unknown>[]): Record<string, unknown>[] {
-  return sales.filter((s) => !isInstallmentCompletionSale(s));
+  return sales.filter((s) => !isInstallmentSaleRecord(s));
 }
 
 /** Net profit total only (dashboard KPI). */

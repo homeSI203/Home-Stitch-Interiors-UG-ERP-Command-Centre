@@ -87,7 +87,7 @@ export interface DailyCashMaps {
   installmentsCashByDate: Record<string, number>;
 }
 
-/** Cash collected per day — sales (by createdAt) + installment payments (by paidAt). */
+/** Cash collected per day — POS cash sales (by createdAt) + installment payments (by paidAt). */
 export function buildDailyCashMaps(
   sales: Record<string, unknown>[],
   payments: Record<string, unknown>[]
@@ -96,6 +96,7 @@ export function buildDailyCashMaps(
   const installmentsCashByDate: Record<string, number> = {};
 
   for (const s of sales) {
+    if (s.installmentPlanId) continue;
     if (normalizePaymentMethod(s.paymentMethod) !== "cash") continue;
     const d = localDateStr(tsToDate(s.createdAt));
     salesCashByDate[d] = (salesCashByDate[d] ?? 0) + Number(s.total ?? 0);

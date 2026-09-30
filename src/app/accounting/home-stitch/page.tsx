@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Loader2, RefreshCw, ArrowDownLeft, ArrowUpRight, Wallet,
@@ -13,7 +13,7 @@ import { useAuthorization } from "@/hooks/use-auth";
 import {
   getAccountSummary,
   listLedgerEntries,
-  syncMissingLedgerEntries,
+  reconcileHomeStitchAccount,
   categoryLabel,
   type HomeStitchLedgerEntry,
   type HomeStitchAccountSummary,
@@ -30,9 +30,11 @@ function fmtDate(d: Date) {
 }
 
 export default function HomeStitchAccountPage() {
-  const { hasPermission } = useAuthorization();
+  const { hasPermission, isSuperAdmin } = useAuthorization();
   const canSyncLedger =
-    hasPermission("manage_home_stitch_account") || hasPermission("manage_accounting");
+    isSuperAdmin ||
+    hasPermission("manage_home_stitch_account") ||
+    hasPermission("manage_accounting");
   const [summary, setSummary] = useState<HomeStitchAccountSummary | null>(null);
   const [entries, setEntries] = useState<HomeStitchLedgerEntry[]>([]);
   const [unpaid, setUnpaid] = useState<PurchasePayable[]>([]);
@@ -47,7 +49,7 @@ export default function HomeStitchAccountPage() {
     try {
       const [s, e] = await Promise.all([
         getAccountSummary(),
-        listLedgerEntries(100),
+        listLedgerEntries(),
       ]);
       setSummary(s);
       setEntries(e);
@@ -65,19 +67,29 @@ export default function HomeStitchAccountPage() {
     }
   }, []);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => { void reload(); }, [reload]);
 
-  const handleSync = async () => {
+  const runReconcile = useCallback(async (announce: boolean) => {
+    if (!canSyncLedger) return;
     setSyncing(true);
-    setSyncMsg(null);
     setError(null);
     try {
-      const result = await syncMissingLedgerEntries();
-      setSyncMsg(
-        result.posted > 0
-          ? `Synced ${result.posted} missing ledger entries.`
-          : "Account is up to date — no missing entries."
-      );
+      const result = await reconcileHomeStitchAccount();
+      const parts = [
+        result.roykemsPayment === "synced" ? "Roykems installments synced" : null,
+        result.posted > 0 ? `${result.posted} ledger lines added` : null,
+        result.removed > 0 ? `${result.removed} removed` : null,
+        result.adjusted > 0 ? `${result.adjusted} corrected` : null,
+      ].filter(Boolean);
+      if (announce) {
+        setSyncMsg(
+          parts.length > 0
+            ? `Ledger updated from the database (${parts.join(", ")}). Balance is UGX ${fmtUGX(result.balance)}.`
+            : `Ledger matches the database. Balance is UGX ${fmtUGX(result.balance)}.`
+        );
+      } else if (parts.length > 0) {
+        setSyncMsg(`Ledger updated from the database (${parts.join(", ")}). Balance is UGX ${fmtUGX(result.balance)}.`);
+      }
       if (result.errors.length > 0) {
         setError(result.errors.slice(0, 3).join(" · "));
       }
@@ -87,6 +99,31 @@ export default function HomeStitchAccountPage() {
     } finally {
       setSyncing(false);
     }
+  }, [canSyncLedger, reload]);
+
+  const didAutoSync = useRef(false);
+  useEffect(() => {
+    if (!canSyncLedger || didAutoSync.current) return;
+    didAutoSync.current = true;
+    void runReconcile(true);
+  }, [canSyncLedger, runReconcile]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && canSyncLedger) {
+        void runReconcile(false);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [canSyncLedger, runReconcile]);
+
+  const handleSync = async () => {
+    await runReconcile(true);
   };
 
   return (
@@ -114,7 +151,7 @@ export default function HomeStitchAccountPage() {
             {canSyncLedger && (
               <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
                 {syncing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-                Sync History
+                Reconcile
               </Button>
             )}
           </div>
@@ -150,11 +187,70 @@ export default function HomeStitchAccountPage() {
                   UGX {fmtUGX(summary.balance)}
                 </p>
                 <p className="text-xs text-muted-foreground font-ui mt-2">
-                  In UGX {fmtUGX(summary.totalIn)} · Out UGX {fmtUGX(summary.totalOut)} · {summary.entryCount} transactions
+                  Cash closes UGX {fmtUGX(summary.cashCloseDeposits)} − expenses UGX {fmtUGX(summary.expenseOutflows)} − purchase payments UGX {fmtUGX(summary.purchaseOutflows)} = UGX {fmtUGX(summary.balance)}
+                </p>
+                <p className={`text-xs font-ui mt-1 ${summary.balanced ? "text-emerald-700" : "text-destructive"}`}>
+                  {summary.balanced
+                    ? "Ledger matches every cash close, expense, and purchase payment."
+                    : "Ledger does not match the source records yet. Use Reconcile to fix it."}
                 </p>
               </div>
             </div>
           </div>
+
+          <div className="page-section p-5 space-y-3">
+            <p className="text-xs font-ui uppercase tracking-wider text-muted-foreground">
+              {summary.monthLabel} — sales minus expenses and purchase payments
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-ui text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground">Sales ({summary.monthSalesCount})</p>
+                <p className="text-lg font-bold tabular-nums text-emerald-700">UGX {fmtUGX(summary.monthSales)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Expenses</p>
+                <p className="text-lg font-bold tabular-nums text-destructive">UGX {fmtUGX(summary.monthExpenses)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Purchase payments</p>
+                <p className="text-lg font-bold tabular-nums text-orange-600">UGX {fmtUGX(summary.monthPurchasePayments)}</p>
+              </div>
+            </div>
+            <p className="font-ui text-sm">
+              UGX {fmtUGX(summary.monthSales)} − UGX {fmtUGX(summary.monthExpenses)} − UGX {fmtUGX(summary.monthPurchasePayments)} ={" "}
+              <span className="font-bold tabular-nums">UGX {fmtUGX(summary.monthNet)}</span>
+            </p>
+            <p className={`font-ui text-sm ${summary.monthVsBalance === 0 ? "text-emerald-700" : "text-amber-800"}`}>
+              {summary.monthVsBalance === 0
+                ? "That equals the current ledger balance."
+                : `Current ledger balance is UGX ${fmtUGX(summary.balance)}. Difference UGX ${fmtUGX(Math.abs(summary.monthVsBalance))} (${summary.monthVsBalance > 0 ? "balance is higher" : "balance is lower"}).`}
+            </p>
+            <p className="font-ui text-xs text-muted-foreground">
+              Cash deposited this month from daily closes is UGX {fmtUGX(summary.monthCashCloses)}. The ledger balance is every cash close minus every expense and purchase payment, so it will not equal this month’s sales unless those are the only amounts in the account.
+            </p>
+          </div>
+
+          {!summary.balanced && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 font-ui space-y-1">
+              {summary.missingCashCloses > 0 && <p>{summary.missingCashCloses} cash close deposit(s) missing from the ledger.</p>}
+              {summary.missingExpenses > 0 && <p>{summary.missingExpenses} expense(s) missing from the ledger.</p>}
+              {summary.missingPayments > 0 && <p>{summary.missingPayments} purchase payment(s) missing from the ledger.</p>}
+              {summary.duplicateEntries > 0 && <p>{summary.duplicateEntries} duplicate ledger line(s).</p>}
+              {summary.orphanEntries > 0 && <p>{summary.orphanEntries} ledger line(s) with no matching record.</p>}
+              {summary.amountMismatches > 0 && <p>{summary.amountMismatches} ledger amount(s) differ from the source record.</p>}
+              {summary.chainBroken && <p>The running balance column does not step from one line to the next.</p>}
+              {summary.storedBalance !== summary.balance && (
+                <p>Stored balance UGX {fmtUGX(summary.storedBalance)} differs from In − Out UGX {fmtUGX(summary.balance)}.</p>
+              )}
+              {(summary.sourceCash !== summary.cashCloseDeposits ||
+                summary.sourceExpenses !== summary.expenseOutflows ||
+                summary.sourcePayments !== summary.purchaseOutflows) && (
+                <p>
+                  Source totals — cash closes UGX {fmtUGX(summary.sourceCash)}, expenses UGX {fmtUGX(summary.sourceExpenses)}, purchase payments UGX {fmtUGX(summary.sourcePayments)}.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Breakdown */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -238,6 +334,12 @@ export default function HomeStitchAccountPage() {
                         <td className="px-4 py-2.5 tabular-nums text-right font-bold">{fmtUGX(e.balanceAfter)}</td>
                       </tr>
                     ))}
+                    <tr className="bg-muted/40 font-bold">
+                      <td className="px-4 py-2.5" colSpan={3}>Totals</td>
+                      <td className="px-4 py-2.5 tabular-nums text-right text-emerald-700">{fmtUGX(summary.totalIn)}</td>
+                      <td className="px-4 py-2.5 tabular-nums text-right text-destructive">{fmtUGX(summary.totalOut)}</td>
+                      <td className="px-4 py-2.5 tabular-nums text-right">{fmtUGX(summary.balance)}</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>

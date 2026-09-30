@@ -11,18 +11,20 @@ import {
   assignRolesToUser,
   activateUser,
   deactivateUser,
+  deleteUserProfile,
 } from "@/services/users.service";
 import { listRoles } from "@/services/roles.service";
 import { logAudit } from "@/services/audit.service";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, useAuthorization } from "@/hooks/use-auth";
 import { getUserDisplayName } from "@/lib/auth-utils";
 import { resetPassword } from "@/services/auth.service";
 import type { Role, UserProfile } from "@/types";
-import { Loader2, Shield, UserCheck, UserX, UserPlus } from "lucide-react";
+import { Loader2, Shield, UserCheck, UserX, UserPlus, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 export default function UserManagementPage() {
   const { user: currentUser } = useAuth();
+  const { isSuperAdmin } = useAuthorization();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,6 +114,28 @@ export default function UserManagementPage() {
     setMessage(`Password reset email sent to ${email}`);
   };
 
+  const handleDeleteUser = async (user: UserProfile) => {
+    if (user.uid === currentUser?.uid) return;
+    if (!confirm(`Permanently delete ${getUserDisplayName(user)} (${user.email})? They will lose access to this system.`)) {
+      return;
+    }
+    try {
+      await deleteUserProfile(user.uid);
+      if (currentUser) {
+        await logAudit({
+          userId: currentUser.uid,
+          userName: getUserDisplayName(currentUser),
+          action: "User Deleted",
+          module: "User Management",
+          details: { targetUser: user.uid, email: user.email },
+        });
+      }
+      await load();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to delete user.");
+    }
+  };
+
   return (
     <DashboardLayout
       title="User Management"
@@ -190,6 +214,15 @@ export default function UserManagementPage() {
                                 <UserCheck className="h-4 w-4 mr-1" /> Activate
                               </>
                             )}
+                          </Button>
+                        )}
+                        {isSuperAdmin && user.uid !== currentUser?.uid && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDeleteUser(user)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" /> Delete
                           </Button>
                         )}
                       </PermissionGate>

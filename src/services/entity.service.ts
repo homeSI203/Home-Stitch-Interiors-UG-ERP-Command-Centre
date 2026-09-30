@@ -89,6 +89,7 @@ export async function createEntity<T extends Record<string, unknown>>(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+  await refreshHomeStitchLedger(collectionName);
   return ref.id;
 }
 
@@ -102,6 +103,7 @@ export async function updateEntity(
     ...data,
     updatedAt: serverTimestamp(),
   });
+  await refreshHomeStitchLedger(collectionName);
 }
 
 /** Find all documents in a collection where `field === value` */
@@ -124,6 +126,7 @@ export async function deleteEntityPermanently(
 ): Promise<void> {
   const db = getFirebaseDb();
   await deleteDoc(doc(db, collectionName, id));
+  await refreshHomeStitchLedger(collectionName);
 }
 
 export async function archiveEntity(
@@ -158,4 +161,22 @@ export function downloadCsv(filename: string, content: string): void {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+const LEDGER_SOURCE_COLLECTIONS = new Set([
+  "expenses",
+  "cashClosings",
+  "purchasePayments",
+  "purchases",
+]);
+
+async function refreshHomeStitchLedger(collectionName: string) {
+  if (typeof window === "undefined") return;
+  if (!LEDGER_SOURCE_COLLECTIONS.has(collectionName)) return;
+  try {
+    const { reconcileHomeStitchAccount } = await import("@/services/home-stitch-account.service");
+    await reconcileHomeStitchAccount();
+  } catch {
+    /* source record is saved; the account page can still rebuild the ledger */
+  }
 }

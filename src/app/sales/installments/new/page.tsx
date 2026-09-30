@@ -896,6 +896,17 @@ export default function NewInstallmentPage() {
         totalAmount,
         costPrice: totalCost,
         planType: planType ?? "shop",
+        ...(planType === "shop"
+          ? {
+              items: items.map((i) => ({
+                productId: i.productId,
+                name: i.name,
+                qty: i.qty,
+                unitPrice: i.unitPrice,
+                costPrice: i.costPrice,
+              })),
+            }
+          : {}),
         ...extra,
       });
       if (invoiceId) {
