@@ -198,38 +198,6 @@ export default function HomeStitchAccountPage() {
             </div>
           </div>
 
-          <div className="page-section p-5 space-y-3">
-            <p className="text-xs font-ui uppercase tracking-wider text-muted-foreground">
-              {summary.monthLabel} — sales minus expenses and purchase payments
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-ui text-sm">
-              <div>
-                <p className="text-xs text-muted-foreground">Sales ({summary.monthSalesCount})</p>
-                <p className="text-lg font-bold tabular-nums text-emerald-700">UGX {fmtUGX(summary.monthSales)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Expenses</p>
-                <p className="text-lg font-bold tabular-nums text-destructive">UGX {fmtUGX(summary.monthExpenses)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Purchase payments</p>
-                <p className="text-lg font-bold tabular-nums text-orange-600">UGX {fmtUGX(summary.monthPurchasePayments)}</p>
-              </div>
-            </div>
-            <p className="font-ui text-sm">
-              UGX {fmtUGX(summary.monthSales)} − UGX {fmtUGX(summary.monthExpenses)} − UGX {fmtUGX(summary.monthPurchasePayments)} ={" "}
-              <span className="font-bold tabular-nums">UGX {fmtUGX(summary.monthNet)}</span>
-            </p>
-            <p className={`font-ui text-sm ${summary.monthVsBalance === 0 ? "text-emerald-700" : "text-amber-800"}`}>
-              {summary.monthVsBalance === 0
-                ? "That equals the current ledger balance."
-                : `Current ledger balance is UGX ${fmtUGX(summary.balance)}. Difference UGX ${fmtUGX(Math.abs(summary.monthVsBalance))} (${summary.monthVsBalance > 0 ? "balance is higher" : "balance is lower"}).`}
-            </p>
-            <p className="font-ui text-xs text-muted-foreground">
-              Cash deposited this month from daily closes is UGX {fmtUGX(summary.monthCashCloses)}. The ledger balance is every cash close minus every expense and purchase payment, so it will not equal this month’s sales unless those are the only amounts in the account.
-            </p>
-          </div>
-
           {!summary.balanced && (
             <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 font-ui space-y-1">
               {summary.missingCashCloses > 0 && <p>{summary.missingCashCloses} cash close deposit(s) missing from the ledger.</p>}

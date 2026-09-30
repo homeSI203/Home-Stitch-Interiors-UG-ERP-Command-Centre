@@ -14,7 +14,6 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { getFirebaseDb } from "@/lib/firebase";
-import { saleCollectedTotal } from "@/lib/sale-metrics";
 
 export const HOME_STITCH_ACCOUNT_ID = "home-stitch";
 
@@ -56,15 +55,6 @@ export interface HomeStitchAccountSummary {
   amountMismatches: number;
   chainBroken: boolean;
   balanced: boolean;
-  monthKey: string;
-  monthLabel: string;
-  monthSales: number;
-  monthSalesCount: number;
-  monthExpenses: number;
-  monthPurchasePayments: number;
-  monthNet: number;
-  monthCashCloses: number;
-  monthVsBalance: number;
 }
 
 function tsToDate(v: unknown): Date | null {
@@ -499,89 +489,16 @@ function summarizeEntries(
     amountMismatches,
     chainBroken,
     balanced,
-    monthKey: "",
-    monthLabel: "",
-    monthSales: 0,
-    monthSalesCount: 0,
-    monthExpenses: 0,
-    monthPurchasePayments: 0,
-    monthNet: 0,
-    monthCashCloses: 0,
-    monthVsBalance: 0,
   };
-}
-
-function currentMonthKey() {
-  const d = new Date();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${d.getFullYear()}-${m}`;
-}
-
-function monthTitle(key: string) {
-  const [y, m] = key.split("-");
-  return new Date(Number(y), Number(m) - 1, 1).toLocaleString("en-UG", {
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function recordMonth(v: unknown): string | null {
-  if (typeof v === "string" && /^\d{4}-\d{2}/.test(v)) return v.slice(0, 7);
-  let d: Date | null = null;
-  if (v && typeof v === "object" && "toDate" in v) d = (v as { toDate(): Date }).toDate();
-  else if (v instanceof Date) d = v;
-  else if (typeof v === "number") d = new Date(v);
-  if (!d || Number.isNaN(d.getTime())) return null;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-async function sumSalesForMonth(month: string) {
-  const db = getFirebaseDb();
-  const snap = await getDocs(collection(db, "sales"));
-  let total = 0;
-  let count = 0;
-  for (const d of snap.docs) {
-    const data = d.data() as Record<string, unknown>;
-    if (recordMonth(data.createdAt) !== month) continue;
-    total += ugx(saleCollectedTotal(data));
-    count++;
-  }
-  return { total, count };
 }
 
 export async function getAccountSummary(): Promise<HomeStitchAccountSummary> {
-  const monthKey = currentMonthKey();
-  const [storedBalance, entries, expected, sales] = await Promise.all([
+  const [storedBalance, entries, expected] = await Promise.all([
     getAccountBalance(),
     listLedgerEntries(),
     loadExpectedLines(),
-    sumSalesForMonth(monthKey),
   ]);
-  const summary = summarizeEntries(entries, storedBalance, expected);
-
-  let monthExpenses = 0;
-  let monthPurchasePayments = 0;
-  let monthCashCloses = 0;
-  for (const line of expected) {
-    if (!line.transactionDate.startsWith(monthKey)) continue;
-    if (line.category === "expense") monthExpenses += line.amount;
-    if (line.category === "purchase_payment") monthPurchasePayments += line.amount;
-    if (line.category === "cash_close") monthCashCloses += line.amount;
-  }
-
-  const monthNet = sales.total - monthExpenses - monthPurchasePayments;
-  return {
-    ...summary,
-    monthKey,
-    monthLabel: monthTitle(monthKey),
-    monthSales: sales.total,
-    monthSalesCount: sales.count,
-    monthExpenses,
-    monthPurchasePayments,
-    monthNet,
-    monthCashCloses,
-    monthVsBalance: summary.balance - monthNet,
-  };
+  return summarizeEntries(entries, storedBalance, expected);
 }
 
 function isRoykemsName(name: string) {
